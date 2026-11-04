@@ -4,9 +4,10 @@ import {
   ArtisanStaff,
   INITIAL_ARTISANS,
   INITIAL_BRANCHES,
+  sanitizeSpecialtyText,
   UserAccessTier,
 } from "./production-os";
-import { executeNeonSql, getNeonConnectionString } from "./neon-clerk";
+import { executeSqlQuery, getDatabaseConnectionString } from "./database";
 
 export const SESSION_COOKIE_DEV = "mkp_session";
 export const SESSION_COOKIE_SECURE = "__Host-mkp_session";
@@ -42,7 +43,7 @@ const SEEDED_DEFAULT_PASSWORDS: Record<string, string> = {
 function getAuthSecret(): string {
   const candidates = [
     process.env.AUTH_SECRET?.trim(),
-    process.env.CLERK_SECRET_KEY?.trim(),
+    process.env.AUTH_SESSION_SECRET?.trim(),
     process.env.DATABASE_URL?.trim(),
   ];
   for (const c of candidates) {
@@ -284,7 +285,9 @@ export function payloadToArtisan(payload: SessionTokenPayload): ArtisanStaff {
     role: payload.role,
     branchId: payload.branchId || INITIAL_BRANCHES[0].id,
     branchName: payload.branchName || INITIAL_BRANCHES[0].name,
-    specialty: payload.specialty || seed?.specialty || "Garment Operations",
+    specialty: sanitizeSpecialtyText(
+      payload.specialty || seed?.specialty || "Garment Operations"
+    ),
     station: payload.station || seed?.station || "Main Factory Floor",
     activeRuns: seed?.activeRuns ?? 0,
     unitsCompletedMonth: seed?.unitsCompletedMonth ?? 0,
@@ -367,13 +370,54 @@ export function clearSessionCookies(
 }
 
 export function extractSessionTokenFromRequest(
-  request: NextRequest
+  request: Request | NextRequest
 ): string | null {
-  return (
-    request.cookies.get(SESSION_COOKIE_SECURE)?.value ||
-    request.cookies.get(SESSION_COOKIE_DEV)?.value ||
-    null
-  );
+  if ("cookies" in request && typeof request.cookies?.get === "function") {
+    return (
+      request.cookies.get(SESSION_COOKIE_SECURE)?.value ||
+      request.cookies.get(SESSION_COOKIE_DEV)?.value ||
+      null
+    );
+  }
+  const cookieHeader = request.headers.get("cookie") || "";
+  if (!cookieHeader) return null;
+  for (const part of cookieHeader.split(";")) {
+    const [rawKey, ...rest] = part.trim().split("=");
+    if (rawKey === SESSION_COOKIE_SECURE || rawKey === SESSION_COOKIE_DEV) {
+      return decodeURIComponent(rest.join("="));
+    }
+  }
+  return null;
+}
+
+export async function requireAuthenticatedSession(
+  request: Request | NextRequest,
+  allowedTiers?: UserAccessTier[]
+): Promise<
+  | { session: SessionTokenPayload; denied: null }
+  | { session: null; denied: NextResponse }
+> {
+  const token = extractSessionTokenFromRequest(request);
+  const session = await verifySessionToken(token);
+  if (!session) {
+    return {
+      session: null,
+      denied: NextResponse.json(
+        { ok: false, error: "Authentication required." },
+        { status: 401 }
+      ),
+    };
+  }
+  if (allowedTiers && !allowedTiers.includes(session.accessTier)) {
+    return {
+      session: null,
+      denied: NextResponse.json(
+        { ok: false, error: "Insufficient permissions for this action." },
+        { status: 403 }
+      ),
+    };
+  }
+  return { session, denied: null };
 }
 
 /**
@@ -397,7 +441,7 @@ export function guardSameOriginMutation(
 
 /**
  * Generates a 6-digit numeric OTP and an HMAC-sealed stateless challenge
- * so password recovery works both with Neon Postgres and in offline/local sandboxes.
+ * so password recovery works both with PostgreSQL and in offline/local sandboxes.
  */
 export async function createResetOtpChallenge(email: string): Promise<{
   code: string;
@@ -433,12 +477,12 @@ export async function verifyResetOtpChallenge(
     return { valid: false, reason: "Please enter the 6-digit verification code." };
   }
 
-  // 1. Check Neon password_reset_tokens first if database is reachable
-  if (getNeonConnectionString()) {
+  // 1. Check PostgreSQL password_reset_tokens first if database is reachable
+  if (getDatabaseConnectionString()) {
     try {
-      await ensureAuthSchemaInNeon();
+      await ensureAuthSchema();
       const codeHash = await sha256Hex(`${cleanEmail}:${cleanCode}`);
-      const { rows } = await executeNeonSql<{
+      const { rows } = await executeSqlQuery<{
         id: string;
         expires_at: string;
         used_at: string | null;
@@ -465,14 +509,14 @@ export async function verifyResetOtpChallenge(
             reason: "This verification code has expired. Request a new 6-digit code.",
           };
         }
-        await executeNeonSql(
+        await executeSqlQuery(
           `UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1`,
           [tokenRow.id]
         );
         return { valid: true };
       }
     } catch {
-      // Fall through to HMAC challenge verification if Neon network is unreachable
+      // Fall through to HMAC challenge verification if database network is unreachable
     }
   }
 
@@ -506,11 +550,11 @@ export async function verifyResetOtpChallenge(
 let authSchemaEnsured = false;
 
 /**
- * Idempotently upgrades Neon Postgres with password_hash, lockout tracking,
+ * Idempotently upgrades PostgreSQL with password_hash, lockout tracking,
  * auth_sessions, and password_reset_tokens tables.
  */
-export async function ensureAuthSchemaInNeon(): Promise<void> {
-  if (authSchemaEnsured || !getNeonConnectionString()) return;
+export async function ensureAuthSchema(): Promise<void> {
+  if (authSchemaEnsured || !getDatabaseConnectionString()) return;
 
   const statements = [
     `ALTER TABLE staff_users ADD COLUMN IF NOT EXISTS password_hash TEXT`,
@@ -541,7 +585,7 @@ export async function ensureAuthSchemaInNeon(): Promise<void> {
   ];
 
   for (const sql of statements) {
-    await executeNeonSql(sql);
+    await executeSqlQuery(sql);
   }
   authSchemaEnsured = true;
 }

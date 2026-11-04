@@ -280,7 +280,7 @@ export const INITIAL_ARTISANS: ArtisanStaff[] = [
     role: "production_manager",
     branchId: "br-yaba",
     branchName: "Yaba Flagship Production Plant",
-    specialty: "Founder, Global Superadmin & Multi-Facility Operations (Clerk ID: user_3LDmpp5iS8YnIwmYQlrRwVZCLz2)",
+    specialty: "Founder, Global Superadmin & Multi-Facility Operations",
     station: "Executive HQ · Lagos",
     activeRuns: 0,
     unitsCompletedMonth: 0,
@@ -296,7 +296,7 @@ export const INITIAL_ARTISANS: ArtisanStaff[] = [
     role: "production_manager",
     branchId: "br-yaba",
     branchName: "Yaba Flagship Production Plant",
-    specialty: "Plant Operations, Private-Label Production & Floor Management (Clerk ID: user_3LE1rxmmBT3KKgnGB1S4E4eTHbF)",
+    specialty: "Plant Operations, Private-Label Production & Floor Management",
     station: "Plant Planning & Merchandising Desk",
     activeRuns: 0,
     unitsCompletedMonth: 0,
@@ -531,6 +531,12 @@ export function isSessionAuthenticated(): boolean {
   return Boolean(meta?.authenticated);
 }
 
+export function sanitizeSpecialtyText(text: string): string {
+  return String(text || "")
+    .replace(/\s*\([^)]*user_[A-Za-z0-9]+[^)]*\)/gi, "")
+    .trim();
+}
+
 export function getCurrentSessionUser(): ArtisanStaff {
   if (typeof window === "undefined") return INITIAL_ARTISANS[0];
   try {
@@ -543,7 +549,11 @@ export function getCurrentSessionUser(): ArtisanStaff {
       clearCurrentSessionUser();
       return INITIAL_ARTISANS[0];
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw) as ArtisanStaff;
+    return {
+      ...parsed,
+      specialty: sanitizeSpecialtyText(parsed.specialty),
+    };
   } catch {
     return INITIAL_ARTISANS[0];
   }
@@ -755,7 +765,11 @@ export function loadArtisans(): ArtisanStaff[] {
       localStorage.setItem(STORAGE_KEYS.ARTISANS, JSON.stringify(INITIAL_ARTISANS));
       return INITIAL_ARTISANS;
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw) as ArtisanStaff[];
+    return parsed.map((a) => ({
+      ...a,
+      specialty: sanitizeSpecialtyText(a.specialty),
+    }));
   } catch {
     return INITIAL_ARTISANS;
   }

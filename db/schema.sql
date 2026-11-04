@@ -1,5 +1,5 @@
--- Miss Kudi Productions — Neon Serverless PostgreSQL Schema + Clerk RBAC Integration
--- Apply in Neon SQL Editor or via POST /api/admin/init-db
+-- Miss Kudi Productions — PostgreSQL Schema & RBAC Operations Tables
+-- Apply via `npm run db:init` or POST /api/admin/init-db
 
 CREATE TABLE IF NOT EXISTS factory_branches (
   id TEXT PRIMARY KEY,
@@ -18,7 +18,6 @@ CREATE TABLE IF NOT EXISTS factory_branches (
 
 CREATE TABLE IF NOT EXISTS staff_users (
   id TEXT PRIMARY KEY,
-  clerk_user_id TEXT UNIQUE,
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT,

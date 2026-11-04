@@ -1,16 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   createResetOtpChallenge,
-  ensureAuthSchemaInNeon,
+  ensureAuthSchema,
   guardSameOriginMutation,
   RESET_CODE_TTL_SECONDS,
 } from "../../../lib/auth-server";
-import { executeNeonSql, getNeonConnectionString } from "../../../lib/neon-clerk";
+import {
+  executeSqlQuery,
+  getDatabaseConnectionString,
+} from "../../../lib/database";
 import { INITIAL_ARTISANS } from "../../../lib/production-os";
+import {
+  attachRateLimitHeaders,
+  enforceRequestRateLimit,
+  RATE_LIMIT_PROFILES,
+} from "../../../lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   const blocked = guardSameOriginMutation(request);
   if (blocked) return blocked;
+
+  const ipCheck = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.authRecoveryIp,
+    undefined,
+    "Too many password recovery requests. Please wait a few minutes before requesting another code."
+  );
+  if (ipCheck.blocked) return ipCheck.blocked;
 
   try {
     const body = await request.json();
@@ -20,11 +36,22 @@ export async function POST(request: NextRequest) {
     const knownClientAccount = Boolean(body.knownClientAccount);
 
     if (!cleanEmail || !cleanEmail.includes("@")) {
-      return NextResponse.json(
-        { ok: false, error: "Please enter a valid factory work email address." },
-        { status: 400 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          { ok: false, error: "Please enter a valid factory work email address." },
+          { status: 400 }
+        ),
+        ipCheck.result
       );
     }
+
+    const accountCheck = enforceRequestRateLimit(
+      request,
+      RATE_LIMIT_PROFILES.authRecoveryAccount,
+      cleanEmail,
+      "Too many verification codes requested for this email. Please wait 15 minutes before trying again."
+    );
+    if (accountCheck.blocked) return accountCheck.blocked;
 
     let accountExists = INITIAL_ARTISANS.some(
       (a) => a.email.toLowerCase() === cleanEmail
@@ -33,10 +60,10 @@ export async function POST(request: NextRequest) {
       INITIAL_ARTISANS.find((a) => a.email.toLowerCase() === cleanEmail)?.name ||
       "Factory Operator";
 
-    if (getNeonConnectionString()) {
+    if (getDatabaseConnectionString()) {
       try {
-        await ensureAuthSchemaInNeon();
-        const { rows } = await executeNeonSql<{ id: string; name: string }>(
+        await ensureAuthSchema();
+        const { rows } = await executeSqlQuery<{ id: string; name: string }>(
           `SELECT id, name FROM staff_users WHERE LOWER(email) = $1 LIMIT 1`,
           [cleanEmail]
         );
@@ -54,12 +81,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (!accountExists) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `No provisioned account found for "${cleanEmail}". Contact Superadmin HQ or your Plant Admin to be added to the roster first.`,
-        },
-        { status: 404 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          {
+            ok: false,
+            error: `No provisioned account found for "${cleanEmail}". Contact your Plant Admin or Superadmin HQ to be added to the roster first.`,
+          },
+          { status: 404 }
+        ),
+        accountCheck.result
       );
     }
 
@@ -67,10 +97,10 @@ export async function POST(request: NextRequest) {
       await createResetOtpChallenge(cleanEmail);
     const expiresAtIso = new Date(expiresAtMs).toISOString();
 
-    if (getNeonConnectionString()) {
+    if (getDatabaseConnectionString()) {
       try {
-        await ensureAuthSchemaInNeon();
-        await executeNeonSql(
+        await ensureAuthSchema();
+        await executeSqlQuery(
           `INSERT INTO password_reset_tokens (id, email, code_hash, expires_at)
            VALUES ($1, $2, $3, $4)`,
           [
@@ -80,7 +110,7 @@ export async function POST(request: NextRequest) {
             expiresAtIso,
           ]
         );
-        await executeNeonSql(
+        await executeSqlQuery(
           `INSERT INTO factory_audit_logs (id, action, actor, role, target_ref, summary)
            VALUES ($1,$2,$3,$4,$5,$6)`,
           [
@@ -104,33 +134,35 @@ export async function POST(request: NextRequest) {
       hostDomain = "localhost";
     }
 
-    // Origin-bound SMS / OTP message format per modern-web-guidance (sms-otp-form):
-    // Human-readable text first, @<domain> #<otp> on final line with no trailing text.
     const originBoundMessage = `Your Miss Kudi Productions verification code is ${code}. Valid for 15 minutes.\n\n@${hostDomain} #${code}`;
 
-    return NextResponse.json({
-      ok: true,
-      email: cleanEmail,
-      expiresInMinutes: Math.round(RESET_CODE_TTL_SECONDS / 60),
-      expiresAt: expiresAtIso,
-      resetChallenge,
-      message: `Sent a 6-digit verification code for ${cleanEmail} (valid for 15 minutes).`,
-      // Provided in console/atelier dispatch preview when no external SMTP gateway is wired
-      dispatchPreview: !process.env.RESEND_API_KEY
-        ? {
-            deliveryMode: "atelier_console_dispatch",
-            otpCode: code,
-            originBoundSmsSample: originBoundMessage,
-          }
-        : undefined,
-    });
+    return attachRateLimitHeaders(
+      NextResponse.json({
+        ok: true,
+        email: cleanEmail,
+        expiresInMinutes: Math.round(RESET_CODE_TTL_SECONDS / 60),
+        expiresAt: expiresAtIso,
+        resetChallenge,
+        message: `Sent a 6-digit verification code for ${cleanEmail} (valid for 15 minutes).`,
+        dispatchPreview: !process.env.RESEND_API_KEY
+          ? {
+              otpCode: code,
+              originBoundSmsSample: originBoundMessage,
+            }
+          : undefined,
+      }),
+      accountCheck.result
+    );
   } catch (err: any) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: err?.message || "Unable to initiate password reset.",
-      },
-      { status: 500 }
+    return attachRateLimitHeaders(
+      NextResponse.json(
+        {
+          ok: false,
+          error: err?.message || "Unable to issue password reset code.",
+        },
+        { status: 500 }
+      ),
+      ipCheck.result
     );
   }
 }

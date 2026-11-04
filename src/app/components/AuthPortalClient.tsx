@@ -7,7 +7,6 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import AtelierWeaveCanvas from "./AtelierWeaveCanvas";
 import {
   ACCESS_TIER_LABELS,
-  ARTISAN_ROLE_LABELS,
   ArtisanStaff,
   clearCurrentSessionUser,
   ClientSessionMeta,
@@ -18,7 +17,6 @@ import {
   isSessionAuthenticated,
   loadArtisans,
   loadLocalPasswordHashes,
-  saveArtisans,
   saveLocalPasswordHash,
   setCurrentSessionUser,
   setRememberedEmail,
@@ -54,9 +52,9 @@ export default function AuthPortalClient({
   const otpFormRef = useRef<HTMLFormElement>(null);
   const otpInputRef = useRef<HTMLInputElement>(null);
   const otpAbortRef = useRef<AbortController | null>(null);
-  const dirtyControlsRef = useRef<WeakMap<EventTarget, { interacted: boolean; blurred: boolean }>>(
-    new WeakMap()
-  );
+  const dirtyControlsRef = useRef<
+    WeakMap<EventTarget, { interacted: boolean; blurred: boolean }>
+  >(new WeakMap());
 
   const toggleWarnId = useId();
   const resetToggleWarnId = useId();
@@ -83,7 +81,7 @@ export default function AuthPortalClient({
   const [sessionMeta, setSessionMeta] = useState<ClientSessionMeta | null>(null);
 
   // Sign-In state
-  const [email, setEmail] = useState("kudi@kproductions.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
   const [hasRememberedEmail, setHasRememberedEmail] = useState(false);
@@ -111,8 +109,7 @@ export default function AuthPortalClient({
 
   // Hydrate remembered email, local roster, and live server cookie session
   useEffect(() => {
-    const localRoster = loadArtisans();
-    setArtisans(localRoster);
+    setArtisans(loadArtisans());
 
     const savedEmail = emailParam.trim() || getRememberedEmail();
     if (savedEmail) {
@@ -126,14 +123,14 @@ export default function AuthPortalClient({
     }
 
     if (signedOutParam) {
-      setStatusMessage("You have been signed out and your session cookie was cleared.");
+      setStatusMessage("You have been signed out and your session was cleared.");
     } else if (reasonParam === "auth_required" && redirectParam) {
       setStatusMessage(
         `Sign in with an authorized Admin, Superadmin, or Staff account to continue to ${redirectParam}.`
       );
     }
 
-    // Fetch authoritative server session & Neon directory
+    // Fetch authoritative server session
     fetch("/api/auth/session")
       .then((r) => r.json())
       .then((data) => {
@@ -152,24 +149,6 @@ export default function AuthPortalClient({
             expiresAt: meta.expiresAt,
             sessionId: meta.sessionId,
           });
-        }
-      })
-      .catch(() => {});
-
-    fetch("/api/admin/users")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.ok && Array.isArray(data.users) && data.users.length > 0) {
-          // Merge server users with any locally onboarded staff not yet pushed
-          const serverEmails = new Set(
-            data.users.map((u: ArtisanStaff) => u.email.toLowerCase())
-          );
-          const localExtras = loadArtisans().filter(
-            (u) => !serverEmails.has(u.email.toLowerCase())
-          );
-          const merged = [...data.users, ...localExtras];
-          setArtisans(merged);
-          saveArtisans(merged);
         }
       })
       .catch(() => {});
@@ -205,7 +184,6 @@ export default function AuthPortalClient({
         if (!cred?.code) return;
         setOtpCode(cred.code);
         requestAnimationFrame(() => {
-          // Trigger standard submit handler via requestSubmit() (never form.submit())
           otpFormRef.current?.requestSubmit();
         });
       })
@@ -218,8 +196,7 @@ export default function AuthPortalClient({
     };
   }, [mode, resetChallenge]);
 
-  // modern-web-guidance (validate-input-after-interaction):
-  // Sync aria-invalid & .user-invalid-fallback on blur (reveal) and input (clear/recover)
+  // modern-web-guidance (validate-input-after-interaction)
   const handleFieldBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const input = e.currentTarget;
     const state = dirtyControlsRef.current.get(input) || {
@@ -393,8 +370,7 @@ export default function AuthPortalClient({
       setDispatchPreview(data.dispatchPreview || null);
       setOtpCode("");
       setStatusMessage(
-        data.message ||
-          `Sent a 6-digit verification code to ${cleanEmail}.`
+        data.message || `Sent a 6-digit verification code to ${cleanEmail}.`
       );
       setMode("reset-verify");
       requestAnimationFrame(() => otpInputRef.current?.focus());
@@ -577,17 +553,8 @@ export default function AuthPortalClient({
       setSessionMeta(null);
       setPassword("");
       setSubmitting(false);
-      setStatusMessage("Signed out of Miss Kudi Operations OS.");
+      setStatusMessage("Signed out of Miss Kudi Operations.");
       router.refresh();
-    }
-  };
-
-  const handleSelectDirectoryAccount = (user: ArtisanStaff) => {
-    setEmail(user.email);
-    setErrorMessage(null);
-    setStatusMessage(null);
-    if (mode === "change-password") {
-      setMode("signin");
     }
   };
 
@@ -597,10 +564,6 @@ export default function AuthPortalClient({
     setRememberMe(false);
     setStatusMessage("Cleared remembered workstation email from this browser.");
   };
-
-  const superadmins = artisans.filter((a) => a.accessTier === "superadmin");
-  const admins = artisans.filter((a) => a.accessTier === "admin");
-  const staffList = artisans.filter((a) => a.accessTier === "staff");
 
   const panelMotion = prefersReducedMotion
     ? {}
@@ -615,7 +578,7 @@ export default function AuthPortalClient({
     <main className="auth-portal-main">
       <div className="container">
         <div className="auth-portal-shell">
-          {/* Compact Top Identity Masthead (kept concise so mobile keyboards never cover inputs) */}
+          {/* Compact Top Identity Masthead */}
           <header className="auth-portal-masthead">
             <div className="auth-masthead-brand">
               <img
@@ -641,7 +604,7 @@ export default function AuthPortalClient({
               <div className="auth-active-banner">
                 <div>
                   <span className="mono auth-active-kicker">
-                    VERIFIED SESSION ·{" "}
+                    ACTIVE SESSION ·{" "}
                     {sessionMeta?.rememberMe ? "30D REMEMBERED" : "8H SHIFT"}
                   </span>
                   <div className="auth-active-user">
@@ -662,7 +625,7 @@ export default function AuthPortalClient({
                     }
                     className="btn-primary auth-compact-btn"
                   >
-                    Continue to Portal →
+                    Continue to Console →
                   </Link>
                   <button
                     type="button"
@@ -670,7 +633,7 @@ export default function AuthPortalClient({
                     onClick={handleSignOut}
                     disabled={submitting}
                   >
-                    Sign out
+                    Sign Out
                   </button>
                 </div>
               </div>
@@ -784,8 +747,7 @@ export default function AuthPortalClient({
                           Work email
                         </label>
                         <span id="signin-email-hint" className="auth-hint">
-                          Use your provisioned plant email (e.g.
-                          kudi@kproductions.com).
+                          Enter your provisioned Miss Kudi work email address.
                         </span>
                         <input
                           type="email"
@@ -801,6 +763,7 @@ export default function AuthPortalClient({
                           autoCapitalize="none"
                           autoCorrect="off"
                           enterKeyHint="next"
+                          placeholder="name@misskudi.com"
                           aria-describedby="signin-email-hint"
                           required
                         />
@@ -910,15 +873,17 @@ export default function AuthPortalClient({
                       >
                         {submitting
                           ? "Verifying credentials..."
-                          : "Sign in to Operations Portal"}
+                          : "Sign in to Operations Console"}
                       </button>
 
                       <div className="auth-secondary-links">
                         <span>Need a standalone recovery link?</span>
                         <Link
-                          href={`/reset-password?email=${encodeURIComponent(
+                          href={`/reset-password${
                             email.trim()
-                          )}`}
+                              ? `?email=${encodeURIComponent(email.trim())}`
+                              : ""
+                          }`}
                           className="auth-inline-anchor"
                         >
                           Open /reset-password →
@@ -971,6 +936,7 @@ export default function AuthPortalClient({
                           autoCapitalize="none"
                           autoCorrect="off"
                           enterKeyHint="done"
+                          placeholder="name@misskudi.com"
                           aria-describedby="reset-email-hint"
                           required
                         />
@@ -1021,7 +987,6 @@ export default function AuthPortalClient({
                       </p>
                     </div>
 
-                    {/* Atelier Console Dispatch Preview when running without external SMTP */}
                     {dispatchPreview && (
                       <div className="auth-dispatch-preview">
                         <div className="auth-dispatch-top">
@@ -1049,7 +1014,6 @@ export default function AuthPortalClient({
                       onSubmit={handleCompleteResetSubmit}
                       noValidate
                     >
-                      {/* Hidden username field so password managers associate new-password with this email */}
                       <input
                         type="email"
                         name="username"
@@ -1064,7 +1028,6 @@ export default function AuthPortalClient({
                         <label htmlFor="otp-input" className="auth-label">
                           6-digit verification code
                         </label>
-                        {/* Hint placed ABOVE input per modern-web-guidance (sms-otp-form) */}
                         <p id="otp-format-hint" className="auth-hint">
                           Enter the 6-digit code sent to your work dispatch
                           (single input supports paste and automatic OTP
@@ -1129,7 +1092,6 @@ export default function AuthPortalClient({
                             screen.
                           </span>
                         </div>
-                        {/* Complexity rules placed ABOVE input per validate-input-after-interaction */}
                         <ul id="password-rules" className="auth-rules-list">
                           <li>At least 8 characters</li>
                           <li>Includes at least one letter and one number</li>
@@ -1342,9 +1304,9 @@ export default function AuthPortalClient({
               </AnimatePresence>
             </section>
 
-            {/* RIGHT COLUMN: Atelier Weave Canvas + Editorial Numbered RBAC Directory Ledger */}
+            {/* RIGHT COLUMN: Atelier Weave Canvas + Operations Access & Security Policy */}
             <aside
-              aria-labelledby="directory-accounts-heading"
+              aria-labelledby="operations-access-heading"
               className="auth-ledger-column"
             >
               <AtelierWeaveCanvas
@@ -1357,158 +1319,71 @@ export default function AuthPortalClient({
                 <div className="auth-directory-head">
                   <div>
                     <span className="mono auth-ledger-kicker">
-                      PROVISIONED RBAC DIRECTORY
+                      WORKSTATION SECURITY &amp; ACCESS POLICY
                     </span>
-                    <h2 id="directory-accounts-heading">
-                      Authorized Factory Accounts ({artisans.length})
+                    <h2 id="operations-access-heading">
+                      Role-Scoped Factory Consoles
                     </h2>
                   </div>
-                  <Link
-                    href="/api/health"
-                    className="btn-secondary auth-compact-btn"
-                  >
-                    /api/health ↗
-                  </Link>
                 </div>
 
-                {/* 01 · Superadmin Governance */}
                 <div className="auth-tier-group">
                   <div className="auth-tier-heading mono">
-                    <span>01 / SUPERADMIN GOVERNANCE</span>
-                    <span>MULTI-FACILITY HQ</span>
+                    <span>01 / ACCESS TIERS</span>
+                    <span>YABA · VI · IKEJA</span>
                   </div>
                   <div className="auth-ledger-rows">
-                    {superadmins.map((user) => {
-                      const selected =
-                        email.trim().toLowerCase() === user.email.toLowerCase();
-                      return (
-                        <div
-                          key={user.id}
-                          className={`auth-ledger-row ${
-                            selected ? "selected" : ""
-                          }`}
-                        >
-                          <div>
-                            <div className="auth-ledger-name">
-                              {user.name}{" "}
-                              <span className="badge badge-gold">
-                                SUPERADMIN
-                              </span>
-                            </div>
-                            <div className="auth-ledger-meta mono">
-                              {user.email} · {user.station}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            className="btn-secondary auth-select-btn"
-                            onClick={() => handleSelectDirectoryAccount(user)}
-                          >
-                            {selected ? "Selected ✓" : "Use email"}
-                          </button>
+                    <div className="auth-ledger-row">
+                      <div>
+                        <div className="auth-ledger-name">
+                          Executive HQ{" "}
+                          <span className="badge badge-gold">SUPERADMIN</span>
                         </div>
-                      );
-                    })}
+                        <div className="auth-ledger-meta">
+                          Multi-plant governance, facility capacity, team
+                          provisioning, and audit logs.
+                        </div>
+                      </div>
+                    </div>
+                    <div className="auth-ledger-row">
+                      <div>
+                        <div className="auth-ledger-name">
+                          Plant Operations{" "}
+                          <span className="badge badge-blue">ADMIN</span>
+                        </div>
+                        <div className="auth-ledger-meta">
+                          Branch production orders, team scheduling, and fabric
+                          runway inventory.
+                        </div>
+                      </div>
+                    </div>
+                    <div className="auth-ledger-row">
+                      <div>
+                        <div className="auth-ledger-name">
+                          Artisan Floor{" "}
+                          <span className="badge badge-green">STAFF</span>
+                        </div>
+                        <div className="auth-ledger-meta">
+                          Pattern grading, cutting lays, sewing batches, and AQL
+                          2.5 QC station sign-offs.
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* 02 · Factory Admins */}
-                <div className="auth-tier-group">
-                  <div className="auth-tier-heading mono">
-                    <span>02 / FACTORY ADMIN TIER</span>
-                    <span>PLANT &amp; MERCHANDISING LEADS</span>
-                  </div>
-                  <div className="auth-ledger-rows">
-                    {admins.map((user) => {
-                      const selected =
-                        email.trim().toLowerCase() === user.email.toLowerCase();
-                      return (
-                        <div
-                          key={user.id}
-                          className={`auth-ledger-row ${
-                            selected ? "selected" : ""
-                          }`}
-                        >
-                          <div>
-                            <div className="auth-ledger-name">
-                              {user.name}{" "}
-                              <span className="badge badge-blue">ADMIN</span>
-                            </div>
-                            <div className="auth-ledger-meta mono">
-                              {user.email} · {user.branchName}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            className="btn-secondary auth-select-btn"
-                            onClick={() => handleSelectDirectoryAccount(user)}
-                          >
-                            {selected ? "Selected ✓" : "Use email"}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 03 · Artisan Floor Staff */}
                 <div className="auth-tier-group" style={{ marginBottom: 0 }}>
                   <div className="auth-tier-heading mono">
-                    <span>03 / ARTISAN FLOOR STAFF</span>
-                    <span>PATTERN · CUTTING · SEWING · QC</span>
+                    <span>02 / SESSION &amp; RATE PROTECTION</span>
+                    <span>HTTPONLY · PBKDF2</span>
                   </div>
-                  {staffList.length === 0 ? (
-                    <div className="auth-empty-staff">
-                      No floor staff accounts provisioned yet. Sign in as{" "}
-                      <strong>Admin</strong> or <strong>Superadmin</strong> to
-                      onboard Pattern Designers, Cutting Masters, Tailors, and
-                      AQL 2.5 QC Inspectors with dedicated passwords, or let new
-                      hires claim their password via{" "}
-                      <button
-                        type="button"
-                        className="auth-link-btn"
-                        onClick={() => setMode("reset-request")}
-                      >
-                        Reset password
-                      </button>
-                      .
-                    </div>
-                  ) : (
-                    <div className="auth-ledger-rows">
-                      {staffList.map((user) => {
-                        const selected =
-                          email.trim().toLowerCase() ===
-                          user.email.toLowerCase();
-                        return (
-                          <div
-                            key={user.id}
-                            className={`auth-ledger-row ${
-                              selected ? "selected" : ""
-                            }`}
-                          >
-                            <div>
-                              <div className="auth-ledger-name">
-                                {user.name}{" "}
-                                <span className="badge badge-green">
-                                  {ARTISAN_ROLE_LABELS[user.role]}
-                                </span>
-                              </div>
-                              <div className="auth-ledger-meta mono">
-                                {user.email} · {user.station}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              className="btn-secondary auth-select-btn"
-                              onClick={() => handleSelectDirectoryAccount(user)}
-                            >
-                              {selected ? "Selected ✓" : "Use email"}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <div className="auth-empty-staff">
+                    Sessions use signed <strong>HttpOnly</strong> cookies (8h
+                    floor shift or 30d workstation) with sliding-window API rate
+                    limits and brute-force lockout protection. Sign out anytime
+                    from the top bar or console sidebar when leaving a shared
+                    terminal.
+                  </div>
                 </div>
               </div>
             </aside>

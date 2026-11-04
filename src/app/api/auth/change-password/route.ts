@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  ensureAuthSchemaInNeon,
+  ensureAuthSchema,
   extractSessionTokenFromRequest,
   guardSameOriginMutation,
   hashPassword,
@@ -9,18 +9,35 @@ import {
   verifySeededDefaultPassword,
   verifySessionToken,
 } from "../../../lib/auth-server";
-import { executeNeonSql, getNeonConnectionString } from "../../../lib/neon-clerk";
+import {
+  executeSqlQuery,
+  getDatabaseConnectionString,
+} from "../../../lib/database";
+import {
+  attachRateLimitHeaders,
+  enforceRequestRateLimit,
+  RATE_LIMIT_PROFILES,
+} from "../../../lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   const blocked = guardSameOriginMutation(request);
   if (blocked) return blocked;
 
+  const rateCheck = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.authMutation
+  );
+  if (rateCheck.blocked) return rateCheck.blocked;
+
   const rawToken = extractSessionTokenFromRequest(request);
   const actorSession = await verifySessionToken(rawToken);
   if (!actorSession) {
-    return NextResponse.json(
-      { ok: false, error: "Active authenticated session required." },
-      { status: 401 }
+    return attachRateLimitHeaders(
+      NextResponse.json(
+        { ok: false, error: "Active authenticated session required." },
+        { status: 401 }
+      ),
+      rateCheck.result
     );
   }
 
@@ -37,28 +54,34 @@ export async function POST(request: NextRequest) {
 
     if (!isSelf) {
       if (actorSession.accessTier === "staff") {
-        return NextResponse.json(
-          { ok: false, error: "Floor staff can only change their own password." },
-          { status: 403 }
+        return attachRateLimitHeaders(
+          NextResponse.json(
+            { ok: false, error: "Floor staff can only change their own password." },
+            { status: 403 }
+          ),
+          rateCheck.result
         );
       }
     }
 
     const strengthError = validatePasswordStrength(newPassword);
     if (strengthError) {
-      return NextResponse.json(
-        { ok: false, error: strengthError },
-        { status: 400 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          { ok: false, error: strengthError },
+          { status: 400 }
+        ),
+        rateCheck.result
       );
     }
 
     let existingDbHash: string | null = null;
     let targetTier = "staff";
 
-    if (getNeonConnectionString()) {
+    if (getDatabaseConnectionString()) {
       try {
-        await ensureAuthSchemaInNeon();
-        const { rows } = await executeNeonSql<{
+        await ensureAuthSchema();
+        const { rows } = await executeSqlQuery<{
           password_hash: string | null;
           access_tier: string;
         }>(
@@ -74,27 +97,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Prevent non-superadmin from overwriting a superadmin's password
     if (
       !isSelf &&
       targetTier === "superadmin" &&
       actorSession.accessTier !== "superadmin"
     ) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Only Superadmin HQ can update a Superadmin password.",
-        },
-        { status: 403 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          {
+            ok: false,
+            error: "Only Superadmin HQ can update a Superadmin password.",
+          },
+          { status: 403 }
+        ),
+        rateCheck.result
       );
     }
 
-    // When changing own password, verify currentPassword first
     if (isSelf) {
       if (!currentPassword) {
-        return NextResponse.json(
-          { ok: false, error: "Please enter your current password." },
-          { status: 400 }
+        return attachRateLimitHeaders(
+          NextResponse.json(
+            { ok: false, error: "Please enter your current password." },
+            { status: 400 }
+          ),
+          rateCheck.result
         );
       }
       const effectiveHash = existingDbHash || fallbackPasswordHash || null;
@@ -103,19 +130,22 @@ export async function POST(request: NextRequest) {
         : verifySeededDefaultPassword(targetEmail, currentPassword);
 
       if (!currentValid) {
-        return NextResponse.json(
-          { ok: false, error: "Your current password is incorrect." },
-          { status: 401 }
+        return attachRateLimitHeaders(
+          NextResponse.json(
+            { ok: false, error: "Your current password is incorrect." },
+            { status: 401 }
+          ),
+          rateCheck.result
         );
       }
     }
 
     const nextHash = await hashPassword(newPassword);
 
-    if (getNeonConnectionString()) {
+    if (getDatabaseConnectionString()) {
       try {
-        await ensureAuthSchemaInNeon();
-        await executeNeonSql(
+        await ensureAuthSchema();
+        await executeSqlQuery(
           `UPDATE staff_users
            SET password_hash = $2,
                must_reset_password = FALSE,
@@ -125,7 +155,7 @@ export async function POST(request: NextRequest) {
            WHERE LOWER(email) = $1`,
           [targetEmail, nextHash]
         );
-        await executeNeonSql(
+        await executeSqlQuery(
           `INSERT INTO factory_audit_logs (id, action, actor, role, target_ref, summary)
            VALUES ($1,$2,$3,$4,$5,$6)`,
           [
@@ -144,18 +174,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      ok: true,
-      targetEmail,
-      passwordHash: nextHash,
-      message: isSelf
-        ? "Your password has been updated."
-        : `Password updated for ${targetEmail}.`,
-    });
+    return attachRateLimitHeaders(
+      NextResponse.json({
+        ok: true,
+        targetEmail,
+        passwordHash: nextHash,
+        message: isSelf
+          ? "Your password has been updated."
+          : `Password updated for ${targetEmail}.`,
+      }),
+      rateCheck.result
+    );
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || "Unable to update password." },
-      { status: 500 }
+    return attachRateLimitHeaders(
+      NextResponse.json(
+        { ok: false, error: err?.message || "Unable to update password." },
+        { status: 500 }
+      ),
+      rateCheck.result
     );
   }
 }

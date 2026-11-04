@@ -1,35 +1,57 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
-  executeNeonSql,
-  getNeonConnectionString,
-  isClerkSecretConfigured,
-} from "../../../lib/neon-clerk";
+  executeSqlQuery,
+  getDatabaseConnectionString,
+} from "../../../lib/database";
 import {
-  ensureAuthSchemaInNeon,
+  ensureAuthSchema,
   guardSameOriginMutation,
   hashPassword,
+  requireAuthenticatedSession,
 } from "../../../lib/auth-server";
 import {
   ArtisanRole,
   ArtisanStaff,
   INITIAL_ARTISANS,
   INITIAL_BRANCHES,
+  sanitizeSpecialtyText,
   UserAccessTier,
 } from "../../../lib/production-os";
+import {
+  attachRateLimitHeaders,
+  enforceRequestRateLimit,
+  RATE_LIMIT_PROFILES,
+} from "../../../lib/rate-limit";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const rateCheck = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.adminRead
+  );
+  if (rateCheck.blocked) return rateCheck.blocked;
+
+  const auth = await requireAuthenticatedSession(request, [
+    "superadmin",
+    "admin",
+    "staff",
+  ]);
+  if (auth.denied) return attachRateLimitHeaders(auth.denied, rateCheck.result);
+
   try {
-    if (!getNeonConnectionString()) {
-      return NextResponse.json({
-        ok: true,
-        source: "hybrid_edge",
-        users: INITIAL_ARTISANS,
-      });
+    if (!getDatabaseConnectionString()) {
+      return attachRateLimitHeaders(
+        NextResponse.json({
+          ok: true,
+          source: "local_hybrid",
+          users: INITIAL_ARTISANS,
+        }),
+        rateCheck.result
+      );
     }
 
-    const { rows } = await executeNeonSql<Record<string, any>>(
+    const { rows } = await executeSqlQuery<Record<string, any>>(
       `SELECT
-        id, clerk_user_id, name, email, access_tier, artisan_role,
+        id, name, email, access_tier, artisan_role,
         branch_id, branch_name, specialty, station, active_runs,
         units_completed_month, qc_pass_rate, shift_status, floor_status
        FROM staff_users
@@ -50,7 +72,7 @@ export async function GET() {
       role: (r.artisan_role as ArtisanRole) || "tailor",
       branchId: String(r.branch_id || INITIAL_BRANCHES[0].id),
       branchName: String(r.branch_name || INITIAL_BRANCHES[0].name),
-      specialty: String(r.specialty || ""),
+      specialty: sanitizeSpecialtyText(String(r.specialty || "")),
       station: String(r.station || "Main Floor"),
       activeRuns: Number(r.active_runs ?? 0),
       unitsCompletedMonth: Number(r.units_completed_month ?? 0),
@@ -60,19 +82,25 @@ export async function GET() {
         (r.floor_status as ArtisanStaff["status"]) || "Active on Floor",
     }));
 
-    return NextResponse.json({
-      ok: true,
-      source: "neon_postgres",
-      users,
-    });
+    return attachRateLimitHeaders(
+      NextResponse.json({
+        ok: true,
+        source: "postgresql",
+        users,
+      }),
+      rateCheck.result
+    );
   } catch (err: any) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: err?.message || "Failed to load RBAC users.",
-        users: INITIAL_ARTISANS,
-      },
-      { status: 200 }
+    return attachRateLimitHeaders(
+      NextResponse.json(
+        {
+          ok: false,
+          error: err?.message || "Failed to load team accounts.",
+          users: INITIAL_ARTISANS,
+        },
+        { status: 200 }
+      ),
+      rateCheck.result
     );
   }
 }
@@ -80,6 +108,19 @@ export async function GET() {
 export async function POST(request: Request) {
   const blocked = guardSameOriginMutation(request);
   if (blocked) return blocked;
+
+  const rateCheck = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.adminWrite
+  );
+  if (rateCheck.blocked) return rateCheck.blocked;
+
+  const auth = await requireAuthenticatedSession(request, [
+    "superadmin",
+    "admin",
+  ]);
+  if (auth.denied) return attachRateLimitHeaders(auth.denied, rateCheck.result);
+
   try {
     const body = await request.json();
     const {
@@ -98,97 +139,50 @@ export async function POST(request: Request) {
       qcPassRate = 99.0,
       shiftStatus = "CLOCKED_IN",
       status = "Active on Floor",
-      actor = "Superadmin HQ",
+      actor = auth.session.name,
     } = body;
 
+    if (
+      accessTier === "superadmin" &&
+      auth.session.accessTier !== "superadmin"
+    ) {
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          {
+            ok: false,
+            error: "Only Superadmin HQ can provision a Superadmin account.",
+          },
+          { status: 403 }
+        ),
+        rateCheck.result
+      );
+    }
+
     if (!name || !email) {
-      return NextResponse.json(
-        { ok: false, error: "Name and email are required." },
-        { status: 400 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          { ok: false, error: "Name and email are required." },
+          { status: 400 }
+        ),
+        rateCheck.result
       );
     }
 
     const userId = id || `art-${Date.now()}`;
-    let clerkUserId: string | null = null;
     const passwordHash =
       password && String(password).length >= 6
         ? await hashPassword(String(password))
         : null;
+    const cleanSpecialty = sanitizeSpecialtyText(specialty);
 
-    // Optional live Clerk user provisioning if CLERK_SECRET_KEY is configured
-    if (isClerkSecretConfigured()) {
-      const clerkSecret = process.env.CLERK_SECRET_KEY!.trim();
-      try {
-        const searchRes = await fetch(
-          `https://api.clerk.com/v1/users?email_address=${encodeURIComponent(
-            email.trim().toLowerCase()
-          )}`,
-          {
-            headers: { Authorization: `Bearer ${clerkSecret}` },
-          }
-        );
-        if (searchRes.ok) {
-          const existing = await searchRes.json();
-          if (Array.isArray(existing) && existing.length > 0) {
-            clerkUserId = existing[0].id;
-            await fetch(`https://api.clerk.com/v1/users/${clerkUserId}`, {
-              method: "PATCH",
-              headers: {
-                Authorization: `Bearer ${clerkSecret}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                public_metadata: {
-                  accessTier,
-                  specialistRole: role,
-                  branchId,
-                  station,
-                },
-              }),
-            });
-          } else if (password && String(password).length >= 6) {
-            const parts = String(name).trim().split(/\s+/);
-            const firstName = parts[0] || "Specialist";
-            const lastName = parts.slice(1).join(" ") || "MKP";
-            const createRes = await fetch("https://api.clerk.com/v1/users", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${clerkSecret}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                email_address: [email.trim().toLowerCase()],
-                password: String(password),
-                skip_password_checks: true,
-                first_name: firstName,
-                last_name: lastName,
-                public_metadata: {
-                  accessTier,
-                  specialistRole: role,
-                  branchId,
-                  station,
-                },
-              }),
-            });
-            if (createRes.ok) {
-              const createdClerk = await createRes.json();
-              clerkUserId = createdClerk.id || null;
-            }
-          }
-        }
-      } catch {
-        // Non-blocking if Clerk network call is unavailable
-      }
-    }
-
-    if (getNeonConnectionString()) {
-      await ensureAuthSchemaInNeon();
-      await executeNeonSql(
+    if (getDatabaseConnectionString()) {
+      await ensureAuthSchema();
+      await executeSqlQuery(
         `INSERT INTO staff_users (
-          id, clerk_user_id, name, email, password_hash, access_tier, artisan_role,
+          id, name, email, password_hash, access_tier, artisan_role,
           branch_id, branch_name, specialty, station, active_runs,
           units_completed_month, qc_pass_rate, shift_status, floor_status, password_changed_at
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, CASE WHEN $5 IS NOT NULL THEN NOW() ELSE NULL END)
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, CASE WHEN $4 IS NOT NULL THEN NOW() ELSE NULL END)
         ON CONFLICT (email) DO UPDATE SET
           name = EXCLUDED.name,
           password_hash = COALESCE(EXCLUDED.password_hash, staff_users.password_hash),
@@ -202,15 +196,14 @@ export async function POST(request: Request) {
           floor_status = EXCLUDED.floor_status`,
         [
           userId,
-          clerkUserId,
           name.trim(),
           email.trim().toLowerCase(),
           passwordHash,
           accessTier,
           role,
-          null, // Avoid FK mismatch between local 'br-yaba' and Neon 'BR-LOS-YABA'
+          null,
           branchName,
-          specialty,
+          cleanSpecialty,
           station,
           Number(activeRuns) || 0,
           Number(unitsCompletedMonth) || 0,
@@ -220,45 +213,50 @@ export async function POST(request: Request) {
         ]
       );
 
-      await executeNeonSql(
+      await executeSqlQuery(
         `INSERT INTO factory_audit_logs (id, action, actor, role, target_ref, summary)
          VALUES ($1,$2,$3,$4,$5,$6)`,
         [
           `aud-${Date.now()}`,
-          "rbac.user_created",
+          "team.user_created",
           actor,
-          "Superadmin / Admin CRUD",
+          auth.session.accessTier.toUpperCase(),
           email.trim().toLowerCase(),
-          `Provisioned ${accessTier.toUpperCase()} account for ${name.trim()} (${role}) at ${branchName}.`,
+          `Added ${accessTier.toUpperCase()} account for ${name.trim()} (${role}) at ${branchName}.`,
         ]
       );
     }
 
-    return NextResponse.json({
-      ok: true,
-      clerkUserId,
-      passwordHash,
-      user: {
-        id: userId,
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        accessTier,
-        role,
-        branchId,
-        branchName,
-        specialty,
-        station,
-        activeRuns: Number(activeRuns) || 0,
-        unitsCompletedMonth: Number(unitsCompletedMonth) || 0,
-        qcPassRate: Number(qcPassRate) || 99.0,
-        shiftStatus,
-        status,
-      },
-    });
+    return attachRateLimitHeaders(
+      NextResponse.json({
+        ok: true,
+        passwordHash,
+        user: {
+          id: userId,
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          accessTier,
+          role,
+          branchId,
+          branchName,
+          specialty: cleanSpecialty,
+          station,
+          activeRuns: Number(activeRuns) || 0,
+          unitsCompletedMonth: Number(unitsCompletedMonth) || 0,
+          qcPassRate: Number(qcPassRate) || 99.0,
+          shiftStatus,
+          status,
+        },
+      }),
+      rateCheck.result
+    );
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || "Failed to create account." },
-      { status: 500 }
+    return attachRateLimitHeaders(
+      NextResponse.json(
+        { ok: false, error: err?.message || "Failed to create account." },
+        { status: 500 }
+      ),
+      rateCheck.result
     );
   }
 }
@@ -266,6 +264,19 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const blocked = guardSameOriginMutation(request);
   if (blocked) return blocked;
+
+  const rateCheck = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.adminWrite
+  );
+  if (rateCheck.blocked) return rateCheck.blocked;
+
+  const auth = await requireAuthenticatedSession(request, [
+    "superadmin",
+    "admin",
+  ]);
+  if (auth.denied) return attachRateLimitHeaders(auth.denied, rateCheck.result);
+
   try {
     const body = await request.json();
     const {
@@ -284,13 +295,32 @@ export async function PUT(request: Request) {
       qcPassRate,
       shiftStatus,
       status,
-      actor = "Superadmin HQ",
+      actor = auth.session.name,
     } = body;
 
+    if (
+      accessTier === "superadmin" &&
+      auth.session.accessTier !== "superadmin"
+    ) {
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          {
+            ok: false,
+            error: "Only Superadmin HQ can promote an account to Superadmin.",
+          },
+          { status: 403 }
+        ),
+        rateCheck.result
+      );
+    }
+
     if (!id && !email) {
-      return NextResponse.json(
-        { ok: false, error: "User id or email is required for update." },
-        { status: 400 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          { ok: false, error: "User id or email is required for update." },
+          { status: 400 }
+        ),
+        rateCheck.result
       );
     }
 
@@ -299,9 +329,9 @@ export async function PUT(request: Request) {
         ? await hashPassword(String(password))
         : null;
 
-    if (getNeonConnectionString()) {
-      await ensureAuthSchemaInNeon();
-      await executeNeonSql(
+    if (getDatabaseConnectionString()) {
+      await ensureAuthSchema();
+      await executeSqlQuery(
         `UPDATE staff_users
          SET
            name = COALESCE($2, name),
@@ -328,7 +358,7 @@ export async function PUT(request: Request) {
           accessTier ?? null,
           role ?? null,
           branchName ?? null,
-          specialty ?? null,
+          specialty !== undefined ? sanitizeSpecialtyText(specialty) : null,
           station ?? null,
           activeRuns !== undefined ? Number(activeRuns) : null,
           unitsCompletedMonth !== undefined ? Number(unitsCompletedMonth) : null,
@@ -339,25 +369,31 @@ export async function PUT(request: Request) {
         ]
       );
 
-      await executeNeonSql(
+      await executeSqlQuery(
         `INSERT INTO factory_audit_logs (id, action, actor, role, target_ref, summary)
          VALUES ($1,$2,$3,$4,$5,$6)`,
         [
           `aud-${Date.now()}`,
-          "rbac.user_updated",
+          "team.user_updated",
           actor,
-          "Superadmin / Admin CRUD",
+          auth.session.accessTier.toUpperCase(),
           email || id,
           `Updated account ${name || email || id} (Tier: ${accessTier || "unchanged"}, Role: ${role || "unchanged"}${passwordHash ? ", Password updated" : ""}).`,
         ]
       );
     }
 
-    return NextResponse.json({ ok: true, id, branchId, passwordHash });
+    return attachRateLimitHeaders(
+      NextResponse.json({ ok: true, id, branchId, passwordHash }),
+      rateCheck.result
+    );
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || "Failed to update account." },
-      { status: 500 }
+    return attachRateLimitHeaders(
+      NextResponse.json(
+        { ok: false, error: err?.message || "Failed to update account." },
+        { status: 500 }
+      ),
+      rateCheck.result
     );
   }
 }
@@ -365,44 +401,66 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   const blocked = guardSameOriginMutation(request);
   if (blocked) return blocked;
+
+  const rateCheck = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.adminWrite
+  );
+  if (rateCheck.blocked) return rateCheck.blocked;
+
+  const auth = await requireAuthenticatedSession(request, [
+    "superadmin",
+    "admin",
+  ]);
+  if (auth.denied) return attachRateLimitHeaders(auth.denied, rateCheck.result);
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id") || "";
     const email = searchParams.get("email") || "";
-    const actor = searchParams.get("actor") || "Superadmin HQ";
+    const actor = searchParams.get("actor") || auth.session.name;
 
     if (!id && !email) {
-      return NextResponse.json(
-        { ok: false, error: "id or email query param required." },
-        { status: 400 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          { ok: false, error: "id or email query param required." },
+          { status: 400 }
+        ),
+        rateCheck.result
       );
     }
 
-    if (getNeonConnectionString()) {
-      await executeNeonSql(
+    if (getDatabaseConnectionString()) {
+      await executeSqlQuery(
         `DELETE FROM staff_users WHERE id = $1 OR email = $2`,
         [id, email.trim().toLowerCase()]
       );
 
-      await executeNeonSql(
+      await executeSqlQuery(
         `INSERT INTO factory_audit_logs (id, action, actor, role, target_ref, summary)
          VALUES ($1,$2,$3,$4,$5,$6)`,
         [
           `aud-${Date.now()}`,
-          "rbac.user_deleted",
+          "team.user_deleted",
           actor,
-          "Superadmin / Admin CRUD",
+          auth.session.accessTier.toUpperCase(),
           email || id,
           `Revoked and deleted account (${email || id}).`,
         ]
       );
     }
 
-    return NextResponse.json({ ok: true, deletedId: id, deletedEmail: email });
+    return attachRateLimitHeaders(
+      NextResponse.json({ ok: true, deletedId: id, deletedEmail: email }),
+      rateCheck.result
+    );
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || "Failed to delete account." },
-      { status: 500 }
+    return attachRateLimitHeaders(
+      NextResponse.json(
+        { ok: false, error: err?.message || "Failed to delete account." },
+        { status: 500 }
+      ),
+      rateCheck.result
     );
   }
 }

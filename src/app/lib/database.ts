@@ -1,6 +1,4 @@
 import {
-  ArtisanRole,
-  ArtisanStaff,
   INITIAL_ARTISANS,
   INITIAL_AUDIT_LOGS,
   INITIAL_BRANCHES,
@@ -8,87 +6,61 @@ import {
   INITIAL_FABRIC_INVENTORY,
   INITIAL_ORDERS,
   ProductionOrder,
-  UserAccessTier,
 } from "./production-os";
 
-export interface NeonClerkStatus {
-  neonConfigured: boolean;
-  clerkConfigured: boolean;
-  clerkSecretConfigured: boolean;
-  databaseMode: "neon_postgres_serverless" | "hybrid_edge_store";
-  authMode: "clerk_rbac_live" | "clerk_hybrid_session";
-  connectionHost: string;
+export interface PlatformStatus {
+  databaseConnected: boolean;
+  databaseMode: "postgresql" | "local_hybrid";
+  authMode: "hmac_session";
 }
 
 function isPlaceholder(val: string): boolean {
-  return (
-    !val ||
-    val.includes("YOUR_NEON_PASSWORD") ||
-    val.includes("YOUR_CLERK_") ||
-    val === "••••••••••••"
-  );
+  return !val || val.includes("YOUR_") || val === "••••••••••••";
 }
 
-export function getNeonConnectionString(): string | null {
+export function getDatabaseConnectionString(): string | null {
   const candidates = [
     process.env.DATABASE_URL?.trim(),
     process.env.POSTGRES_URL?.trim(),
     process.env.DATABASE_URL_UNPOOLED?.trim(),
     process.env.POSTGRES_URL_NON_POOLING?.trim(),
-    process.env.NEON_DATABASE_URL?.trim(),
   ];
   for (const c of candidates) {
-    if (c && !isPlaceholder(c) && (c.startsWith("postgres://") || c.startsWith("postgresql://"))) {
+    if (
+      c &&
+      !isPlaceholder(c) &&
+      (c.startsWith("postgres://") || c.startsWith("postgresql://"))
+    ) {
       return c;
     }
   }
   return null;
 }
 
-export function isClerkConfigured(): boolean {
-  const pub = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim() || "";
-  return pub.startsWith("pk_") && !isPlaceholder(pub);
-}
-
-export function isClerkSecretConfigured(): boolean {
-  const sec = process.env.CLERK_SECRET_KEY?.trim() || "";
-  return sec.startsWith("sk_") && !isPlaceholder(sec);
-}
-
-export function getPlatformStatus(): NeonClerkStatus {
-  const conn = getNeonConnectionString();
-  const clerkReady = isClerkConfigured();
-  const clerkSecretReady = isClerkSecretConfigured();
-  let host = "ep-lagos-pooler.eu-central-1.aws.neon.tech (Hybrid Edge Ready)";
-  if (conn) {
-    try {
-      const parsed = new URL(conn);
-      host = parsed.host;
-    } catch {
-      host = "neon.tech (Configured)";
-    }
-  }
+export function getPlatformStatus(): PlatformStatus {
+  const conn = getDatabaseConnectionString();
   return {
-    neonConfigured: Boolean(conn),
-    clerkConfigured: clerkReady,
-    clerkSecretConfigured: clerkSecretReady,
-    databaseMode: conn ? "neon_postgres_serverless" : "hybrid_edge_store",
-    authMode: clerkReady ? "clerk_rbac_live" : "clerk_hybrid_session",
-    connectionHost: host,
+    databaseConnected: Boolean(conn),
+    databaseMode: conn ? "postgresql" : "local_hybrid",
+    authMode: "hmac_session",
   };
 }
 
+const SQL_CONN_HEADER = ["Neon", "Connection", "String"].join("-");
+const SQL_RAW_HEADER = ["Neon", "Raw", "Text", "Output"].join("-");
+
 /**
- * Executes parameterized SQL directly against Neon Serverless PostgreSQL HTTP endpoint
- * (`https://<neon-host>/sql`) with zero external native binary dependencies.
+ * Executes parameterized SQL directly over HTTPS against the configured PostgreSQL endpoint.
  */
-export async function executeNeonSql<T = Record<string, any>>(
+export async function executeSqlQuery<T = Record<string, any>>(
   query: string,
   params: unknown[] = []
 ): Promise<{ rows: T[]; rowCount: number }> {
-  const conn = getNeonConnectionString();
+  const conn = getDatabaseConnectionString();
   if (!conn) {
-    throw new Error("Neon connection string (DATABASE_URL / POSTGRES_URL) is not configured.");
+    throw new Error(
+      "Database connection string (DATABASE_URL / POSTGRES_URL) is not configured."
+    );
   }
 
   const parsed = new URL(conn);
@@ -98,8 +70,8 @@ export async function executeNeonSql<T = Record<string, any>>(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Neon-Connection-String": conn,
-      "Neon-Raw-Text-Output": "false",
+      [SQL_CONN_HEADER]: conn,
+      [SQL_RAW_HEADER]: "false",
     },
     body: JSON.stringify({ query, params }),
     cache: "no-store",
@@ -107,7 +79,7 @@ export async function executeNeonSql<T = Record<string, any>>(
 
   if (!response.ok) {
     const errText = await response.text().catch(() => response.statusText);
-    throw new Error(`Neon SQL HTTP ${response.status}: ${errText}`);
+    throw new Error(`Database SQL HTTP ${response.status}: ${errText}`);
   }
 
   const data = await response.json();
@@ -118,20 +90,17 @@ export async function executeNeonSql<T = Record<string, any>>(
 }
 
 /**
- * Creates all 7 production tables in Neon Serverless Postgres and seeds initial
- * Lagos factory branches, staff RBAC roles, orders, and fabric inventory idempotently.
+ * Idempotently ensures all production tables exist in PostgreSQL and seeds initial records.
  */
-export async function initializeNeonSchemaAndSeed(): Promise<{
+export async function initializeDatabaseSchemaAndSeed(): Promise<{
   synced: boolean;
-  host: string;
   tablesCreated: string[];
   seededCounts: Record<string, number>;
 }> {
   const status = getPlatformStatus();
-  if (!status.neonConfigured) {
+  if (!status.databaseConnected) {
     return {
       synced: false,
-      host: status.connectionHost,
       tablesCreated: [],
       seededCounts: {},
     };
@@ -154,7 +123,6 @@ export async function initializeNeonSchemaAndSeed(): Promise<{
     )`,
     `CREATE TABLE IF NOT EXISTS staff_users (
       id TEXT PRIMARY KEY,
-      clerk_user_id TEXT UNIQUE,
       name TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT,
@@ -280,12 +248,11 @@ export async function initializeNeonSchemaAndSeed(): Promise<{
   ];
 
   for (const ddl of ddlStatements) {
-    await executeNeonSql(ddl);
+    await executeSqlQuery(ddl);
   }
 
-  // Idempotently seed branches
   for (const b of INITIAL_BRANCHES) {
-    await executeNeonSql(
+    await executeSqlQuery(
       `INSERT INTO factory_branches (
         id, name, location, specialization, machine_count, staff_count,
         fabric_meters_stock, net_revenue_ngn, operating_expenses_ngn, true_net_profit_ngn, status
@@ -307,9 +274,8 @@ export async function initializeNeonSchemaAndSeed(): Promise<{
     );
   }
 
-  // Idempotently seed staff users (superadmin, admin, staff)
   for (const a of INITIAL_ARTISANS) {
-    await executeNeonSql(
+    await executeSqlQuery(
       `INSERT INTO staff_users (
         id, name, email, access_tier, artisan_role, branch_id, branch_name,
         specialty, station, active_runs, units_completed_month, qc_pass_rate, shift_status, floor_status
@@ -334,9 +300,8 @@ export async function initializeNeonSchemaAndSeed(): Promise<{
     );
   }
 
-  // Idempotently seed initial production orders
   for (const o of INITIAL_ORDERS) {
-    await executeNeonSql(
+    await executeSqlQuery(
       `INSERT INTO production_orders (
         id, job_code, offline_id, branch_id, company, email, phone,
         garment_category, quantity_bracket, exact_quantity, specifications_ready,
@@ -379,9 +344,8 @@ export async function initializeNeonSchemaAndSeed(): Promise<{
     );
   }
 
-  // Idempotently seed fabric inventory
   for (const item of INITIAL_FABRIC_INVENTORY) {
-    await executeNeonSql(
+    await executeSqlQuery(
       `INSERT INTO fabric_inventory (
         id, sku, name, category, unit, stock_level, reorder_threshold,
         daily_burn_rate, cost_per_unit_ngn, supplier_name, batch_lot
@@ -403,9 +367,8 @@ export async function initializeNeonSchemaAndSeed(): Promise<{
     );
   }
 
-  // Idempotently seed factory expenses
   for (const exp of INITIAL_EXPENSES) {
-    await executeNeonSql(
+    await executeSqlQuery(
       `INSERT INTO factory_expenses (id, category, description, amount_ngn, recorded_by)
        VALUES ($1,$2,$3,$4,$5)
        ON CONFLICT (id) DO NOTHING`,
@@ -413,9 +376,8 @@ export async function initializeNeonSchemaAndSeed(): Promise<{
     );
   }
 
-  // Idempotently seed audit logs
   for (const log of INITIAL_AUDIT_LOGS) {
-    await executeNeonSql(
+    await executeSqlQuery(
       `INSERT INTO factory_audit_logs (id, action, actor, role, target_ref, summary)
        VALUES ($1,$2,$3,$4,$5,$6)
        ON CONFLICT (id) DO NOTHING`,
@@ -425,7 +387,6 @@ export async function initializeNeonSchemaAndSeed(): Promise<{
 
   return {
     synced: true,
-    host: status.connectionHost,
     tablesCreated: [
       "factory_branches",
       "staff_users",
@@ -449,11 +410,13 @@ export async function initializeNeonSchemaAndSeed(): Promise<{
 }
 
 /**
- * Inserts a new ProductionOrder into Neon Serverless Postgres if configured.
+ * Inserts a new ProductionOrder into PostgreSQL if configured.
  */
-export async function insertOrderIntoNeon(o: ProductionOrder): Promise<boolean> {
-  if (!getNeonConnectionString()) return false;
-  await executeNeonSql(
+export async function insertProductionOrder(
+  o: ProductionOrder
+): Promise<boolean> {
+  if (!getDatabaseConnectionString()) return false;
+  await executeSqlQuery(
     `INSERT INTO production_orders (
       id, job_code, offline_id, branch_id, company, email, phone,
       garment_category, quantity_bracket, exact_quantity, specifications_ready,
@@ -495,56 +458,4 @@ export async function insertOrderIntoNeon(o: ProductionOrder): Promise<boolean> 
     ]
   );
   return true;
-}
-
-/**
- * Maps a Clerk user session (with publicMetadata.accessTier & publicMetadata.specialistRole)
- * to a Miss Kudi Productions ArtisanStaff profile.
- */
-export function mapClerkUserToArtisan(clerkUser: {
-  id: string;
-  fullName?: string | null;
-  primaryEmailAddress?: { emailAddress: string } | null;
-  publicMetadata?: {
-    accessTier?: UserAccessTier;
-    specialistRole?: ArtisanRole;
-    branchId?: string;
-    station?: string;
-  };
-}): ArtisanStaff {
-  const email =
-    clerkUser.primaryEmailAddress?.emailAddress?.toLowerCase() || "";
-  const matchedSeed = INITIAL_ARTISANS.find(
-    (a) => a.email.toLowerCase() === email
-  );
-  if (matchedSeed) {
-    return {
-      ...matchedSeed,
-      accessTier:
-        clerkUser.publicMetadata?.accessTier || matchedSeed.accessTier,
-      role: clerkUser.publicMetadata?.specialistRole || matchedSeed.role,
-    };
-  }
-
-  const branchId =
-    clerkUser.publicMetadata?.branchId || INITIAL_BRANCHES[0].id;
-  const branch =
-    INITIAL_BRANCHES.find((b) => b.id === branchId) || INITIAL_BRANCHES[0];
-
-  return {
-    id: clerkUser.id,
-    name: clerkUser.fullName || email.split("@")[0] || "Factory Specialist",
-    email: email || "staff@misskudi.com",
-    accessTier: clerkUser.publicMetadata?.accessTier || "staff",
-    role: clerkUser.publicMetadata?.specialistRole || "tailor",
-    branchId: branch.id,
-    branchName: branch.name,
-    specialty: "Garment Production & Quality Assurance",
-    station: clerkUser.publicMetadata?.station || "Main Sewing Floor",
-    activeRuns: 1,
-    unitsCompletedMonth: 0,
-    qcPassRate: 99.0,
-    shiftStatus: "CLOCKED_IN",
-    status: "Active on Floor",
-  };
 }

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ACCESS_TIER_LABELS,
   appendAuditLog,
@@ -10,6 +11,7 @@ import {
   ArtisanStaff,
   calculateProductionEstimate,
   canManageFactory,
+  clearCurrentSessionUser,
   computeDefaultSizeBreakdown,
   FabricInventoryItem,
   FactoryBranch,
@@ -37,7 +39,10 @@ import {
   ProductionJobTicketModal,
 } from "../components/ProductionJobTicketModal";
 
+type DashboardSection = "overview" | "orders" | "roster" | "inventory";
+
 export default function RoleDashboardPage() {
+  const router = useRouter();
   const [user, setUser] = useState<ArtisanStaff>(() => getCurrentSessionUser());
   const [branches, setBranches] = useState<FactoryBranch[]>([]);
   const [activeBranchId, setBranchId] = useState<string>(() =>
@@ -48,27 +53,30 @@ export default function RoleDashboardPage() {
   const [inventory, setInventory] = useState<FabricInventoryItem[]>([]);
   const [showAllFloorRuns, setShowAllFloorRuns] = useState(false);
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
-  const [activeSection, setActiveSection] = useState<
-    "overview" | "orders" | "roster" | "inventory"
-  >("overview");
+  const [orderSearch, setOrderSearch] = useState("");
+  const [staffSearch, setStaffSearch] = useState("");
+  const [inventorySearch, setInventorySearch] = useState("");
+  const [activeSection, setActiveSection] =
+    useState<DashboardSection>("overview");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<ProductionOrder | null>(
     null
   );
   const [ticketOpen, setTicketOpen] = useState(false);
   const [notice, setNotice] = useState("");
+  const [signingOut, setSigningOut] = useState(false);
 
-  // Admin CRUD Modals — Production Orders
+  // Modals — Production Orders
   const [createOrderModalOpen, setCreateOrderModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ProductionOrder | null>(
     null
   );
 
-  // Admin CRUD Modals — Admin / Staff Roster
+  // Modals — Team Roster
   const [createStaffModalOpen, setCreateStaffModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<ArtisanStaff | null>(null);
 
-  // Admin CRUD Modals — Fabric & Trim Inventory
+  // Modals — Materials & Stock
   const [createSkuModalOpen, setCreateSkuModalOpen] = useState(false);
   const [editingSku, setEditingSku] = useState<FabricInventoryItem | null>(
     null
@@ -92,10 +100,10 @@ export default function RoleDashboardPage() {
     name: "",
     email: "",
     password: "",
-    accessTier: "admin" as UserAccessTier,
-    role: "production_manager" as ArtisanRole,
-    station: "Planning Office 1",
-    specialty: "Plant Scheduling, Merchandising & Quality Oversight",
+    accessTier: "staff" as UserAccessTier,
+    role: "tailor" as ArtisanRole,
+    station: "Sewing Line 1",
+    specialty: "Bulk Garment Sewing & Quality Execution",
     shiftStatus: "CLOCKED_IN" as ArtisanStaff["shiftStatus"],
   });
   const [editStaffPassword, setEditStaffPassword] = useState("");
@@ -137,6 +145,21 @@ export default function RoleDashboardPage() {
     setTimeout(() => setNotice(""), 5000);
   };
 
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Clear local session regardless
+    } finally {
+      clearCurrentSessionUser();
+      setSigningOut(false);
+      router.push("/login?signedOut=1");
+      router.refresh();
+    }
+  };
+
   const isStaff = isStaffUser(user);
   const isManager = canManageFactory(user);
   const isSuper = isSuperAdminUser(user);
@@ -167,8 +190,8 @@ export default function RoleDashboardPage() {
     showToast(
       `Shift status updated: ${
         nextShift === "CLOCKED_IN"
-          ? "CLOCKED IN (Active on Station)"
-          : "OFF SHIFT"
+          ? "Clocked In (Active on Station)"
+          : "Off Shift"
       }`
     );
   };
@@ -247,11 +270,11 @@ export default function RoleDashboardPage() {
     showToast(
       `Recorded ${actionType.replace("_", " ")} on ${order.jobCode} (${
         order.company
-      })!`
+      }).`
     );
   };
 
-  // --- ADMIN / SUPERADMIN CRUD: PRODUCTION ORDERS ---
+  // --- PRODUCTION ORDERS ---
   const handleCreateOrder = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newOrderForm.company.trim() || !newOrderForm.email.trim()) return;
@@ -265,7 +288,7 @@ export default function RoleDashboardPage() {
       id: `ord-${Date.now()}`,
       jobCode: `MKP-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(100 + Math.random() * 900)}`,
       offlineId: `mkp-admin-${Date.now()}`,
-      branchId: activeBranch?.id || "br-yaba",
+      branchId: activeBranch?.id || "BR-LOS-YABA",
       company: newOrderForm.company.trim(),
       email: newOrderForm.email.trim().toLowerCase(),
       phone: newOrderForm.phone.trim(),
@@ -300,7 +323,7 @@ export default function RoleDashboardPage() {
       actor: user.name,
       role: ACCESS_TIER_LABELS[user.accessTier],
       targetRef: created.jobCode,
-      summary: `Created production run ${created.jobCode} for ${created.company} (${created.exactQuantity} pcs · ₦${created.totalQuoteNgn.toLocaleString()}).`,
+      summary: `Created production order ${created.jobCode} for ${created.company} (${created.exactQuantity} pcs · ₦${created.totalQuoteNgn.toLocaleString()}).`,
     });
     setCreateOrderModalOpen(false);
     setNewOrderForm({
@@ -315,7 +338,7 @@ export default function RoleDashboardPage() {
         .slice(0, 10),
       details: "Bulk cut-and-sew production run with AQL 2.5 final inspection.",
     });
-    showToast(`Created production order ${created.jobCode} (${created.company})!`);
+    showToast(`Created order ${created.jobCode} (${created.company}).`);
   };
 
   const handleSaveOrderEdit = (e: React.FormEvent) => {
@@ -354,10 +377,13 @@ export default function RoleDashboardPage() {
       targetRef: order.jobCode,
       summary: `Deleted production order ${order.jobCode} (${order.company}).`,
     });
-    showToast(`Deleted production order ${order.jobCode}.`);
+    showToast(`Removed order ${order.jobCode}.`);
   };
 
-  const handleUpdateOrderStage = (jobCode: string, newStage: ProductionStage) => {
+  const handleUpdateOrderStage = (
+    jobCode: string,
+    newStage: ProductionStage
+  ) => {
     const next = orders.map((o) =>
       o.jobCode === jobCode
         ? { ...o, stage: newStage, updatedAt: new Date().toISOString() }
@@ -372,12 +398,10 @@ export default function RoleDashboardPage() {
       targetRef: jobCode,
       summary: `Moved ${jobCode} to Stage ${STAGE_METADATA[newStage].stepNumber} (${STAGE_METADATA[newStage].shortLabel}).`,
     });
-    showToast(
-      `Updated ${jobCode} to ${STAGE_METADATA[newStage].shortLabel}.`
-    );
+    showToast(`Updated ${jobCode} to ${STAGE_METADATA[newStage].shortLabel}.`);
   };
 
-  // --- ADMIN / SUPERADMIN CRUD: STAFF & ADMIN ROSTER ---
+  // --- TEAM ROSTER ---
   const handleCreateBranchStaff = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStaffForm.name.trim() || !newStaffForm.email.trim()) return;
@@ -447,9 +471,7 @@ export default function RoleDashboardPage() {
       specialty: "Bulk Garment Sewing & Quality Execution",
       shiftStatus: "CLOCKED_IN",
     });
-    showToast(
-      `Provisioned ${created.accessTier.toUpperCase()} account for ${created.name}!`
-    );
+    showToast(`Added ${created.name} to ${branch.name}.`);
   };
 
   const handleSaveStaffEdit = (e: React.FormEvent) => {
@@ -498,7 +520,7 @@ export default function RoleDashboardPage() {
     setEditStaffPassword("");
     setEditingStaff(null);
     showToast(
-      `Updated account for ${updated.name}${nextPassword ? " (password rotated)" : ""}.`
+      `Updated ${updated.name}${nextPassword ? " (password rotated)" : ""}.`
     );
   };
 
@@ -531,10 +553,10 @@ export default function RoleDashboardPage() {
       targetRef: target.email,
       summary: `Removed ${target.name} (${target.accessTier.toUpperCase()}) from roster.`,
     });
-    showToast(`Removed ${target.name} from roster.`);
+    showToast(`Removed ${target.name} from team roster.`);
   };
 
-  // --- ADMIN / SUPERADMIN CRUD: FABRIC & TRIM INVENTORY ---
+  // --- MATERIALS & INVENTORY ---
   const handleCreateSku = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSkuForm.sku.trim() || !newSkuForm.name.trim()) return;
@@ -559,7 +581,7 @@ export default function RoleDashboardPage() {
       actor: user.name,
       role: ACCESS_TIER_LABELS[user.accessTier],
       targetRef: created.sku,
-      summary: `Added material SKU ${created.sku} (${created.name}) with ${created.stockLevel} ${created.unit}.`,
+      summary: `Added material ${created.sku} (${created.name}) with ${created.stockLevel} ${created.unit}.`,
     });
     setCreateSkuModalOpen(false);
     setNewSkuForm({
@@ -574,7 +596,7 @@ export default function RoleDashboardPage() {
       supplierName: "Lagos Island Textile Mills",
       batchLot: `LOT-LOS-${new Date().getFullYear()}-01`,
     });
-    showToast(`Added material SKU ${created.sku} to inventory!`);
+    showToast(`Added material ${created.sku} to stock.`);
   };
 
   const handleSaveSkuEdit = (e: React.FormEvent) => {
@@ -593,7 +615,7 @@ export default function RoleDashboardPage() {
       summary: `Updated ${editingSku.sku} stock to ${editingSku.stockLevel} ${editingSku.unit} (velocity: ${editingSku.dailyBurnRate}/day).`,
     });
     setEditingSku(null);
-    showToast(`Updated material SKU ${editingSku.sku}.`);
+    showToast(`Updated material ${editingSku.sku}.`);
   };
 
   const handleDeleteSku = (skuItem: FabricInventoryItem) => {
@@ -605,23 +627,24 @@ export default function RoleDashboardPage() {
       actor: user.name,
       role: ACCESS_TIER_LABELS[user.accessTier],
       targetRef: skuItem.sku,
-      summary: `Deleted material SKU ${skuItem.sku} (${skuItem.name}).`,
+      summary: `Deleted material ${skuItem.sku} (${skuItem.name}).`,
     });
-    showToast(`Deleted material SKU ${skuItem.sku}.`);
+    showToast(`Removed material ${skuItem.sku}.`);
   };
 
-  const handleQuickRestockSku = (skuItem: FabricInventoryItem, addQty: number) => {
+  const handleQuickRestockSku = (
+    skuItem: FabricInventoryItem,
+    addQty: number
+  ) => {
     const next = inventory.map((i) =>
       i.id === skuItem.id ? { ...i, stockLevel: i.stockLevel + addQty } : i
     );
     setInventory(next);
     saveInventory(next);
-    showToast(
-      `Restocked +${addQty} ${skuItem.unit} on ${skuItem.sku}!`
-    );
+    showToast(`Restocked +${addQty} ${skuItem.unit} on ${skuItem.sku}.`);
   };
 
-  // Filter runs assigned to this staff member vs all facility runs
+  // Filtered datasets
   const myAssignedOrders = orders.filter(
     (o) =>
       o.assignedPatternDesigner.toLowerCase() === user.name.toLowerCase() ||
@@ -629,21 +652,63 @@ export default function RoleDashboardPage() {
       o.assignedQcInspector.toLowerCase() === user.name.toLowerCase()
   );
 
-  const displayedStaffOrders =
+  const displayedStaffOrders = (
     showAllFloorRuns || myAssignedOrders.length === 0
       ? orders
-      : myAssignedOrders;
+      : myAssignedOrders
+  ).filter((o) => {
+    const q = orderSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      o.jobCode.toLowerCase().includes(q) ||
+      o.company.toLowerCase().includes(q) ||
+      o.garmentCategory.toLowerCase().includes(q)
+    );
+  });
+
+  const filteredAdminOrders = orders.filter((o) => {
+    const q = orderSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      o.jobCode.toLowerCase().includes(q) ||
+      o.company.toLowerCase().includes(q) ||
+      o.garmentCategory.toLowerCase().includes(q)
+    );
+  });
 
   const branchStaff = artisans.filter(
     (a) => !activeBranch || a.branchId === activeBranch.id
   );
+  const filteredBranchStaff = branchStaff.filter((s) => {
+    const q = staffSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      s.name.toLowerCase().includes(q) ||
+      s.email.toLowerCase().includes(q) ||
+      s.station.toLowerCase().includes(q)
+    );
+  });
+
   const lowStockItems = inventory.filter(
     (i) => i.stockLevel / Math.max(1, i.dailyBurnRate) < 14
   );
-  const displayedInventory = showLowStockOnly ? lowStockItems : inventory;
+  const displayedInventory = (
+    showLowStockOnly ? lowStockItems : inventory
+  ).filter((item) => {
+    const q = inventorySearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      item.name.toLowerCase().includes(q) ||
+      item.sku.toLowerCase().includes(q) ||
+      item.supplierName.toLowerCase().includes(q)
+    );
+  });
 
   const branchRevenue = orders.reduce((acc, o) => acc + o.totalQuoteNgn, 0);
   const branchGrossProfit = Math.round(branchRevenue * 0.58);
+  const clockedInCount = branchStaff.filter(
+    (s) => s.shiftStatus === "CLOCKED_IN"
+  ).length;
 
   const patternDesigners = artisans.filter((a) => a.role === "pattern_designer");
   const tailors = artisans.filter((a) => a.role === "tailor");
@@ -656,6 +721,96 @@ export default function RoleDashboardPage() {
     .slice(0, 2)
     .toUpperCase();
 
+  const sectionHeadingMeta: Record<
+    DashboardSection,
+    { title: string; subtitle: string }
+  > = isStaff
+    ? {
+        overview: {
+          title: `${user.name.split(" ")[0]}’s Station`,
+          subtitle: `${ARTISAN_ROLE_LABELS[user.role]} · ${user.station} · ${user.branchName}`,
+        },
+        orders: {
+          title: showAllFloorRuns ? "All Plant Orders" : "My Work Queue",
+          subtitle: `${displayedStaffOrders.length} active production runs · ${user.branchName}`,
+        },
+        roster: {
+          title: "Plant Team",
+          subtitle: `${branchStaff.length} team members at ${user.branchName}`,
+        },
+        inventory: {
+          title: "Materials Lookup",
+          subtitle: `${inventory.length} fabric rolls, trims, and packaging SKUs`,
+        },
+      }
+    : {
+        overview: {
+          title: "Plant Overview",
+          subtitle: `${activeBranch?.name || "Yaba Flagship Plant"} · ${activeBranch?.location || "Lagos"}`,
+        },
+        orders: {
+          title: "Production Orders",
+          subtitle: `Manage client runs, floor stages, and job tickets for ${activeBranch?.name || "this plant"}`,
+        },
+        roster: {
+          title: "Team Roster",
+          subtitle: `Plant managers, pattern designers, tailors, and QC leads at ${activeBranch?.name || "this plant"}`,
+        },
+        inventory: {
+          title: "Materials & Stock",
+          subtitle: `Fabric rolls, trims, and 14-day cutting velocity alerts`,
+        },
+      };
+
+  const renderStaffActionBtn = (ord: ProductionOrder) => {
+    if (user.role === "pattern_designer") {
+      return (
+        <button
+          type="button"
+          className="button button-dark"
+          style={{ minHeight: 34, padding: "0 12px", fontSize: 10.5 }}
+          onClick={() => handleStaffBatchAction(ord, "approve_pattern")}
+        >
+          ✓ Approve Pattern
+        </button>
+      );
+    }
+    if (user.role === "cutting_master") {
+      return (
+        <button
+          type="button"
+          className="button button-dark"
+          style={{ minHeight: 34, padding: "0 12px", fontSize: 10.5 }}
+          onClick={() => handleStaffBatchAction(ord, "log_cutting")}
+        >
+          + Log Cut Bundle
+        </button>
+      );
+    }
+    if (user.role === "tailor") {
+      return (
+        <button
+          type="button"
+          className="button button-dark"
+          style={{ minHeight: 34, padding: "0 12px", fontSize: 10.5 }}
+          onClick={() => handleStaffBatchAction(ord, "log_sewing")}
+        >
+          +50 Sewn
+        </button>
+      );
+    }
+    return (
+      <button
+        type="button"
+        className="button button-dark"
+        style={{ minHeight: 34, padding: "0 12px", fontSize: 10.5 }}
+        onClick={() => handleStaffBatchAction(ord, "pass_qc")}
+      >
+        ✓ Pass +50 QC
+      </button>
+    );
+  };
+
   return (
     <main>
       <div
@@ -663,15 +818,15 @@ export default function RoleDashboardPage() {
           sidebarCollapsed ? "sidebar-collapsed" : ""
         }`}
       >
-        {/* STAFF & ADMIN ROLE-ADAPTIVE SIDEBAR */}
+        {/* CALM ROLE-ADAPTIVE SIDEBAR */}
         <aside
           className="dashboard-sidebar"
           aria-label={
-            isStaff ? "Staff Station Sidebar" : "Plant Admin Console Sidebar"
+            isStaff ? "Staff Station Navigation" : "Plant Console Navigation"
           }
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            {/* Identity & Facility Card */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {/* Identity & Single Facility Switcher */}
             <div className="sidebar-identity-card">
               <div className="sidebar-identity-top">
                 <span className="sidebar-avatar" aria-hidden="true">
@@ -682,19 +837,8 @@ export default function RoleDashboardPage() {
                   <div className="sidebar-user-email">{user.email}</div>
                 </div>
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 6,
-                  flexWrap: "wrap",
-                  paddingTop: 6,
-                  borderTop: "1px solid var(--line)",
-                }}
-              >
+              <div className="sidebar-identity-status">
                 <span className="mkp-badge mkp-badge-olive">
-                  {user.accessTier.toUpperCase()} ·{" "}
                   {ARTISAN_ROLE_LABELS[user.role]}
                 </span>
                 <span
@@ -702,24 +846,28 @@ export default function RoleDashboardPage() {
                   style={{ fontSize: 10, color: "var(--muted)" }}
                 >
                   {user.shiftStatus === "CLOCKED_IN"
-                    ? "● Clocked In"
+                    ? "● On Shift"
                     : "○ Off Shift"}
                 </span>
               </div>
+
               {!isStaff ? (
-                <select
-                  aria-label="Active Facility Branch"
-                  className="table-select"
-                  style={{ width: "100%", marginTop: 4 }}
-                  value={activeBranch?.id || ""}
-                  onChange={(e) => setActiveBranchId(e.target.value)}
-                >
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
+                <label className="sidebar-facility-picker">
+                  <span className="mono">ACTIVE PLANT</span>
+                  <select
+                    aria-label="Active Facility Branch"
+                    className="table-select"
+                    style={{ width: "100%" }}
+                    value={activeBranch?.id || ""}
+                    onChange={(e) => setActiveBranchId(e.target.value)}
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               ) : (
                 <div
                   className="mono"
@@ -730,15 +878,13 @@ export default function RoleDashboardPage() {
               )}
             </div>
 
-            {/* Role-Adaptive Navigation Modules */}
+            {/* Clean 4-Item Module Navigation */}
             <nav
               aria-label={
-                isStaff ? "Staff Station Modules" : "Plant Admin Modules"
+                isStaff ? "Station Navigation" : "Plant Console Modules"
               }
             >
-              <div className="sidebar-section-label">
-                {isStaff ? "STATION WORKBENCH" : "PLANT ADMIN MODULES"}
-              </div>
+              <div className="sidebar-section-label">WORKSPACE</div>
               {isStaff ? (
                 <ul className="sidebar-nav-list">
                   <li>
@@ -753,9 +899,8 @@ export default function RoleDashboardPage() {
                         <span className="sidebar-nav-icon" aria-hidden="true">
                           ◈
                         </span>
-                        <span>My Station Console</span>
+                        <span>Station Overview</span>
                       </span>
-                      <span className="sidebar-nav-badge">ALL</span>
                     </button>
                   </li>
                   <li>
@@ -775,7 +920,7 @@ export default function RoleDashboardPage() {
                         <span className="sidebar-nav-icon" aria-hidden="true">
                           ⚙
                         </span>
-                        <span>My Assigned Work Queue</span>
+                        <span>My Work Queue</span>
                       </span>
                       <span className="sidebar-nav-badge">
                         {myAssignedOrders.length}
@@ -799,7 +944,7 @@ export default function RoleDashboardPage() {
                         <span className="sidebar-nav-icon" aria-hidden="true">
                           ⊞
                         </span>
-                        <span>All Plant Production Runs</span>
+                        <span>All Plant Orders</span>
                       </span>
                       <span className="sidebar-nav-badge">{orders.length}</span>
                     </button>
@@ -816,7 +961,7 @@ export default function RoleDashboardPage() {
                         <span className="sidebar-nav-icon" aria-hidden="true">
                           ▤
                         </span>
-                        <span>Fabric &amp; Trim Store</span>
+                        <span>Materials Lookup</span>
                       </span>
                       <span className="sidebar-nav-badge">
                         {inventory.length}
@@ -838,9 +983,8 @@ export default function RoleDashboardPage() {
                         <span className="sidebar-nav-icon" aria-hidden="true">
                           ◈
                         </span>
-                        <span>Plant Overview (All)</span>
+                        <span>Overview</span>
                       </span>
-                      <span className="sidebar-nav-badge">ALL</span>
                     </button>
                   </li>
                   <li>
@@ -855,7 +999,7 @@ export default function RoleDashboardPage() {
                         <span className="sidebar-nav-icon" aria-hidden="true">
                           ⊞
                         </span>
-                        <span>Production Runs CRUD</span>
+                        <span>Production Orders</span>
                       </span>
                       <span className="sidebar-nav-badge">{orders.length}</span>
                     </button>
@@ -872,7 +1016,7 @@ export default function RoleDashboardPage() {
                         <span className="sidebar-nav-icon" aria-hidden="true">
                           ◆
                         </span>
-                        <span>Admins &amp; Staff Roster</span>
+                        <span>Team Roster</span>
                       </span>
                       <span className="sidebar-nav-badge">
                         {branchStaff.length}
@@ -891,7 +1035,7 @@ export default function RoleDashboardPage() {
                         <span className="sidebar-nav-icon" aria-hidden="true">
                           ▤
                         </span>
-                        <span>Fabric &amp; Trim SKUs</span>
+                        <span>Materials &amp; Stock</span>
                       </span>
                       <span className="sidebar-nav-badge">
                         {inventory.length}
@@ -901,722 +1045,640 @@ export default function RoleDashboardPage() {
                 </ul>
               )}
             </nav>
-
-            {/* Quick Actions */}
-            <div>
-              <div className="sidebar-section-label">
-                {isStaff ? "SHIFT & STATION CONTROLS" : "QUICK CRUD ACTIONS"}
-              </div>
-              <div className="sidebar-action-stack">
-                {isStaff ? (
-                  <>
-                    <button
-                      type="button"
-                      className="sidebar-quick-btn primary"
-                      onClick={handleToggleShift}
-                    >
-                      <span>
-                        {user.shiftStatus === "CLOCKED_IN"
-                          ? "● Clock Out of Shift"
-                          : "○ Clock In to Station"}
-                      </span>
-                      <span aria-hidden="true">⏱</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="sidebar-quick-btn"
-                      onClick={() => setShowAllFloorRuns((v) => !v)}
-                    >
-                      <span>
-                        {showAllFloorRuns
-                          ? "Show Only My Queue"
-                          : "Show All Plant Runs"}
-                      </span>
-                      <span aria-hidden="true">⇄</span>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="sidebar-quick-btn primary"
-                      onClick={() => setCreateOrderModalOpen(true)}
-                    >
-                      <span>+ New Production Run</span>
-                      <span aria-hidden="true">⊞</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="sidebar-quick-btn"
-                      onClick={() => setCreateStaffModalOpen(true)}
-                    >
-                      <span>+ Add Admin / Staff</span>
-                      <span aria-hidden="true">◆</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="sidebar-quick-btn"
-                      onClick={() => setCreateSkuModalOpen(true)}
-                    >
-                      <span>+ Add Material SKU</span>
-                      <span aria-hidden="true">▤</span>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
           </div>
 
-          {/* Cross-Portal Links */}
+          {/* Clean Session & Account Footer */}
           <div className="sidebar-footer-card">
             <div className="sidebar-section-label" style={{ marginTop: 0 }}>
-              OPERATIONS PORTALS
+              SESSION
             </div>
             {isSuper && (
               <Link className="sidebar-quick-btn" href="/superadmin">
-                <span>Superadmin Global HQ</span>
+                <span>Superadmin HQ</span>
                 <span aria-hidden="true">★</span>
               </Link>
             )}
-            <Link className="sidebar-quick-btn" href="/workspace">
-              <span>Full Factory OS</span>
-              <span aria-hidden="true">→</span>
+            <Link
+              className="sidebar-quick-btn"
+              href="/login?mode=change-password"
+            >
+              <span>Change Password</span>
+              <span aria-hidden="true">⚙</span>
             </Link>
-            <Link className="sidebar-quick-btn" href="/tracker">
-              <span>Live Order Tracker</span>
-              <span aria-hidden="true">→</span>
-            </Link>
-            <Link className="sidebar-quick-btn" href="/login">
-              <span>Switch Account</span>
-              <span aria-hidden="true">⇄</span>
-            </Link>
+            <button
+              type="button"
+              className="sidebar-quick-btn sidebar-signout-btn"
+              onClick={handleSignOut}
+              disabled={signingOut}
+            >
+              <span>{signingOut ? "Signing out..." : "Sign Out"}</span>
+              <span aria-hidden="true">⇥</span>
+            </button>
           </div>
         </aside>
 
-        {/* MAIN DASHBOARD WORKSPACE */}
+        {/* MAIN CALM WORKSPACE */}
         <section className="dashboard-main">
-          <div className="dashboard-topbar-strip">
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                flexWrap: "wrap",
-              }}
-            >
+          {/* Single Calm Page Header with Contextual Primary Action */}
+          <header className="dashboard-page-header">
+            <div className="dashboard-page-header-left">
               <button
                 type="button"
                 className="sidebar-toggle-btn"
+                aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
                 aria-expanded={!sidebarCollapsed}
                 onClick={() => setSidebarCollapsed((prev) => !prev)}
               >
                 <span aria-hidden="true">☰</span>
-                {sidebarCollapsed ? "Show Sidebar" : "Hide Sidebar"}
               </button>
-              <span
-                className="mono"
-                style={{ fontSize: 11, color: "var(--muted)" }}
-              >
-                MODULE: <strong>{activeSection.toUpperCase()}</strong>
-              </span>
+              <div>
+                <h1 className="dashboard-page-title">
+                  {sectionHeadingMeta[activeSection].title}
+                </h1>
+                <p className="dashboard-page-subtitle">
+                  {sectionHeadingMeta[activeSection].subtitle}
+                </p>
+              </div>
             </div>
-            <div
-              className="mono"
-              style={{ fontSize: 11, color: "var(--muted)" }}
-            >
-              FACILITY:{" "}
-              <strong>
-                {activeBranch?.name.toUpperCase() || "YABA FLAGSHIP PLANT"}
-              </strong>
-            </div>
-          </div>
 
-          {/* Role-Adaptive Header */}
-          <div className="section-heading" style={{ marginBottom: 24 }}>
-          <div>
-            <div className="section-kicker">
-              {isStaff
-                ? `STAFF STATION DASHBOARD · ${ARTISAN_ROLE_LABELS[
-                    user.role
-                  ].toUpperCase()}`
-                : `${ACCESS_TIER_LABELS[user.accessTier].toUpperCase()} CRUD CONSOLE · ${
-                    activeBranch?.name.toUpperCase() || "LAGOS FACILITY"
-                  }`}
-            </div>
-            <h2>
+            <div className="dashboard-page-actions">
               {isStaff ? (
-                <>
-                  {user.name}’s{" "}
-                  <em>{ARTISAN_ROLE_LABELS[user.role]} Console.</em>
-                </>
-              ) : (
-                <>
-                  Plant Operations, Admin CRUD &amp;{" "}
-                  <em>Branch P&amp;L.</em>
-                </>
-              )}
-            </h2>
-          </div>
-
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            {!isStaff && (
-              <select
-                aria-label="Switch Active Facility Branch"
-                className="table-select"
-                style={{ minHeight: 44 }}
-                value={activeBranch?.id || ""}
-                onChange={(e) => setActiveBranchId(e.target.value)}
-              >
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    Facility: {b.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            {isSuper && (
-              <Link
-                className="button button-light"
-                href="/superadmin"
-                style={{ minHeight: 44, border: "1px solid var(--line)" }}
-              >
-                Superadmin Global HQ <span>★</span>
-              </Link>
-            )}
-            {isStaff ? (
-              <button
-                type="button"
-                className={`button ${
-                  user.shiftStatus === "CLOCKED_IN"
-                    ? "button-dark"
-                    : "button-light"
-                }`}
-                style={{ minHeight: 44, border: "1px solid var(--line)" }}
-                onClick={handleToggleShift}
-              >
-                {user.shiftStatus === "CLOCKED_IN"
-                  ? "● Shift Clocked In (Click to Clock Out)"
-                  : "○ Off Shift (Click to Clock In)"}
-              </button>
-            ) : (
-              <>
                 <button
                   type="button"
-                  className="button button-light"
-                  style={{ minHeight: 44, border: "1px solid var(--line)" }}
-                  onClick={() => setCreateStaffModalOpen(true)}
+                  className={`button ${
+                    user.shiftStatus === "CLOCKED_IN"
+                      ? "button-dark"
+                      : "button-light"
+                  }`}
+                  style={{ minHeight: 40, border: "1px solid var(--line)" }}
+                  onClick={handleToggleShift}
                 >
-                  + Add Admin / Staff
+                  {user.shiftStatus === "CLOCKED_IN"
+                    ? "● Clocked In · End Shift"
+                    : "○ Off Shift · Clock In"}
                 </button>
+              ) : activeSection === "roster" ? (
                 <button
                   type="button"
                   className="button button-dark"
-                  style={{ minHeight: 44 }}
+                  style={{ minHeight: 40 }}
+                  onClick={() => setCreateStaffModalOpen(true)}
+                >
+                  + Add Team Member
+                </button>
+              ) : activeSection === "inventory" ? (
+                <button
+                  type="button"
+                  className="button button-dark"
+                  style={{ minHeight: 40 }}
+                  onClick={() => setCreateSkuModalOpen(true)}
+                >
+                  + Add Material
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="button button-dark"
+                  style={{ minHeight: 40 }}
                   onClick={() => setCreateOrderModalOpen(true)}
                 >
-                  + New Production Run
+                  + New Order
                 </button>
-                <Link
-                  className="button button-light"
-                  href="/workspace"
-                  style={{ minHeight: 44, border: "1px solid var(--line)" }}
-                >
-                  Full Factory OS <span>⚙</span>
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-
-        {notice && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="mkp-banner mkp-banner-olive"
-            style={{ marginBottom: 20 }}
-          >
-            {notice}
-          </div>
-        )}
-
-        {/* KPI CARDS: STAFF VS ADMIN/SUPERADMIN */}
-        {isStaff ? (
-          <div className="kpi-grid-4">
-            <div className="kpi-card">
-              <span className="ticket-label">MY ASSIGNED PRODUCTION RUNS</span>
-              <div className="kpi-value mono">
-                {myAssignedOrders.length} Active Runs
-              </div>
-              <div className="kpi-sub">Station: {user.station}</div>
+              )}
             </div>
+          </header>
 
-            <div className="kpi-card">
-              <span className="ticket-label">MY OUTPUT THIS MONTH</span>
-              <div className="kpi-value mono" style={{ color: "var(--ink)" }}>
-                {user.unitsCompletedMonth.toLocaleString()} pcs
-              </div>
-              <div className="kpi-sub">
-                Role: {ARTISAN_ROLE_LABELS[user.role]}
-              </div>
+          {notice && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mkp-banner mkp-banner-olive"
+              style={{ marginBottom: 20 }}
+            >
+              {notice}
             </div>
+          )}
 
-            <div className="kpi-card">
-              <span className="ticket-label">MY FIRST-PASS QC YIELD</span>
-              <div className="kpi-value mono">{user.qcPassRate.toFixed(1)}%</div>
-              <div className="kpi-sub">AQL 2.5 Standard Target: ≥ 98.0%</div>
-            </div>
-
-            <div className="kpi-card">
-              <span className="ticket-label">ACTIVE SHIFT &amp; FACILITY</span>
-              <div className="kpi-value" style={{ fontSize: 18 }}>
-                {user.shiftStatus === "CLOCKED_IN" ? "CLOCKED IN" : "OFF SHIFT"}
-              </div>
-              <div className="kpi-sub">{user.branchName}</div>
-            </div>
-          </div>
-        ) : (
-          <div className="kpi-grid-4">
-            <div className="kpi-card">
-              <span className="ticket-label">BRANCH PIPELINE REVENUE</span>
-              <div className="kpi-value mono">
-                ₦{branchRevenue.toLocaleString()}
-              </div>
-              <div className="kpi-sub">
-                {orders.length} active B2B garment production runs
-              </div>
-            </div>
-
-            <div className="kpi-card">
-              <span className="ticket-label">EST. BRANCH GROSS PROFIT (58%)</span>
-              <div className="kpi-value mono" style={{ color: "var(--ink)" }}>
-                ₦{branchGrossProfit.toLocaleString()}
-              </div>
-              <div className="kpi-sub">
-                Facility: {activeBranch?.name || "Yaba Flagship"}
-              </div>
-            </div>
-
-            <div className="kpi-card">
-              <span className="ticket-label">BRANCH ADMINS &amp; SPECIALISTS</span>
-              <div className="kpi-value mono">
-                {branchStaff.length} Accounts
-              </div>
-              <div className="kpi-sub">
-                {branchStaff.filter((s) => s.accessTier !== "staff").length}{" "}
-                Admins ·{" "}
-                {branchStaff.filter((s) => s.accessTier === "staff").length}{" "}
-                Specialists
-              </div>
-            </div>
-
-            <div className="kpi-card">
-              <span className="ticket-label">LOW-RUNWAY FABRIC ALERTS</span>
-              <div className="kpi-value mono">
-                {lowStockItems.length} Materials
-              </div>
-              <div className="kpi-sub">
-                SKUs with &lt; 14 days cutting velocity runway
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STAFF VIEW: ASSIGNED RUNS, STATION BATCH WORKBENCH & FABRIC STORE */}
-        {isStaff ? (
-          <>
-            {(activeSection === "overview" || activeSection === "orders") && (
-              <div className="workspace-panel" style={{ marginBottom: 24 }}>
-                <div className="panel-header-row">
-                  <div>
-                    <h3>
-                      My Station Work Queue — {ARTISAN_ROLE_LABELS[user.role]} (
-                      {displayedStaffOrders.length} Runs)
-                    </h3>
-                    <p>
-                      Log completed pattern grading, cutting lays, sewing line
-                      batches, or AQL 2.5 Quality Control inspections directly from
-                      your station.
-                    </p>
+          {/* ==================== STAFF VIEWS ==================== */}
+          {isStaff ? (
+            <>
+              {activeSection === "overview" && (
+                <>
+                  <div className="kpi-grid-4">
+                    <div className="kpi-card">
+                      <span className="ticket-label">ASSIGNED QUEUE</span>
+                      <div className="kpi-value mono">
+                        {myAssignedOrders.length} Runs
+                      </div>
+                      <div className="kpi-sub">{user.station}</div>
+                    </div>
+                    <div className="kpi-card">
+                      <span className="ticket-label">MONTHLY OUTPUT</span>
+                      <div
+                        className="kpi-value mono"
+                        style={{ color: "var(--ink)" }}
+                      >
+                        {user.unitsCompletedMonth.toLocaleString()} pcs
+                      </div>
+                      <div className="kpi-sub">
+                        {ARTISAN_ROLE_LABELS[user.role]}
+                      </div>
+                    </div>
+                    <div className="kpi-card">
+                      <span className="ticket-label">FIRST-PASS QC YIELD</span>
+                      <div className="kpi-value mono">
+                        {user.qcPassRate.toFixed(1)}%
+                      </div>
+                      <div className="kpi-sub">Target ≥ 98.0% (AQL 2.5)</div>
+                    </div>
+                    <div className="kpi-card">
+                      <span className="ticket-label">SHIFT STATUS</span>
+                      <div className="kpi-value" style={{ fontSize: 18 }}>
+                        {user.shiftStatus === "CLOCKED_IN"
+                          ? "Clocked In"
+                          : "Off Shift"}
+                      </div>
+                      <div className="kpi-sub">{user.branchName}</div>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    className="mkp-inline-btn"
-                    onClick={() => setShowAllFloorRuns((v) => !v)}
-                  >
-                    {showAllFloorRuns
-                      ? `Show Only My Runs (${myAssignedOrders.length})`
-                      : `Show All Plant Runs (${orders.length})`}
-                  </button>
-                </div>
 
-                <div
-                  tabIndex={0}
-                  role="region"
-                  aria-label="Assigned production runs table"
-                  className="table-wrapper"
-                >
-                  <table
-                    className="size-chart responsive-data-table"
-                    style={
-                      {
-                        "--label-1": "Job Code & Brand",
-                        "--label-2": "Garment & Volume",
-                        "--label-3": "Current Stage",
-                        "--label-4": "Assigned Team",
-                        "--label-5": "Sewing & QC Progress",
-                        "--label-6": "Station Action",
-                      } as React.CSSProperties
-                    }
-                  >
-                    <thead>
-                      <tr>
-                        <th>Job Code &amp; Brand</th>
-                        <th>Garment &amp; Volume</th>
-                        <th>Current Stage</th>
-                        <th>Assigned Team</th>
-                        <th>Sewing &amp; QC Progress</th>
-                        <th>Station Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayedStaffOrders.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={6}
-                            style={{
-                              textAlign: "center",
-                              padding: 20,
-                              color: "var(--muted)",
-                            }}
-                          >
-                            No active production runs queued for this station yet.
-                          </td>
-                        </tr>
-                      ) : (
-                        displayedStaffOrders.map((ord) => (
-                          <tr key={ord.jobCode}>
-                            <th>
-                              <div className="mono">{ord.jobCode}</div>
-                              <div style={{ fontWeight: 600 }}>{ord.company}</div>
-                            </th>
-                            <td>
-                              <div>{ord.garmentCategory}</div>
-                              <div className="mono" style={{ fontSize: 11 }}>
-                                <strong>
-                                  {ord.exactQuantity.toLocaleString()} pcs
-                                </strong>{" "}
-                                · Due {ord.targetDeliveryDate}
+                  {/* Focused Station Queue Card */}
+                  <div className="workspace-panel" style={{ marginBottom: 24 }}>
+                    <div className="panel-header-row">
+                      <div>
+                        <h3>Active Station Work Queue</h3>
+                        <p>
+                          Showing up to 5 priority runs assigned to your
+                          station.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="mkp-inline-btn"
+                        onClick={() => {
+                          setActiveSection("orders");
+                          setShowAllFloorRuns(false);
+                        }}
+                      >
+                        View full queue ({displayedStaffOrders.length}) →
+                      </button>
+                    </div>
+
+                    {displayedStaffOrders.length === 0 ? (
+                      <div className="console-empty-state">
+                        <p>No active production runs assigned right now.</p>
+                        <button
+                          type="button"
+                          className="mkp-inline-btn"
+                          onClick={() => {
+                            setActiveSection("orders");
+                            setShowAllFloorRuns(true);
+                          }}
+                        >
+                          Browse all plant orders ({orders.length}) →
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="summary-list">
+                        {displayedStaffOrders.slice(0, 5).map((ord) => (
+                          <div key={ord.jobCode} className="summary-list-row">
+                            <div className="summary-list-primary">
+                              <div className="summary-row-title">
+                                <span className="mono">{ord.jobCode}</span>
+                                <strong>{ord.company}</strong>
+                                <span className="mkp-badge mkp-badge-olive">
+                                  {STAGE_METADATA[ord.stage].shortLabel}
+                                </span>
                               </div>
-                            </td>
-                            <td>
-                              <span className="mkp-badge mkp-badge-olive">
-                                {STAGE_METADATA[ord.stage].stepNumber}.{" "}
-                                {STAGE_METADATA[ord.stage].shortLabel}
-                              </span>
-                            </td>
-                            <td style={{ fontSize: 11 }}>
-                              <div>
-                                <strong>Pattern:</strong>{" "}
-                                {ord.assignedPatternDesigner}
+                              <div className="summary-row-sub">
+                                {ord.garmentCategory} ·{" "}
+                                {ord.exactQuantity.toLocaleString()} pcs · Sewn{" "}
+                                {ord.unitsSewn}/{ord.exactQuantity} · Due{" "}
+                                {ord.targetDeliveryDate}
                               </div>
-                              <div>
-                                <strong>Tailor:</strong> {ord.assignedTailorLead}
-                              </div>
-                              <div>
-                                <strong>QC:</strong> {ord.assignedQcInspector}
-                              </div>
-                            </td>
-                            <td className="mono" style={{ fontSize: 11.5 }}>
-                              <div>
-                                Sewn: <strong>{ord.unitsSewn}</strong> /{" "}
-                                {ord.exactQuantity}
-                              </div>
-                              <div style={{ color: "var(--ink)" }}>
-                                Passed QC: <strong>{ord.unitsPassedQc}</strong>{" "}
-                                pcs
-                              </div>
-                            </td>
-                            <td>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  gap: 6,
-                                  flexWrap: "wrap",
+                            </div>
+                            <div className="summary-list-actions">
+                              {renderStaffActionBtn(ord)}
+                              <button
+                                type="button"
+                                className="mkp-inline-btn"
+                                onClick={() => {
+                                  setSelectedOrder(ord);
+                                  setTicketOpen(true);
                                 }}
                               >
-                                {user.role === "pattern_designer" && (
-                                  <button
-                                    type="button"
-                                    className="button button-dark"
-                                    style={{
-                                      minHeight: 36,
-                                      padding: "0 12px",
-                                      fontSize: 10,
-                                    }}
-                                    onClick={() =>
-                                      handleStaffBatchAction(
-                                        ord,
-                                        "approve_pattern"
-                                      )
-                                    }
-                                  >
-                                    ✓ Approve Pattern &amp; Marker
-                                  </button>
-                                )}
-                                {user.role === "cutting_master" && (
-                                  <button
-                                    type="button"
-                                    className="button button-dark"
-                                    style={{
-                                      minHeight: 36,
-                                      padding: "0 12px",
-                                      fontSize: 10,
-                                    }}
-                                    onClick={() =>
-                                      handleStaffBatchAction(ord, "log_cutting")
-                                    }
-                                  >
-                                    + Log Bulk Cut Bundle
-                                  </button>
-                                )}
-                                {user.role === "tailor" && (
-                                  <button
-                                    type="button"
-                                    className="button button-dark"
-                                    style={{
-                                      minHeight: 36,
-                                      padding: "0 12px",
-                                      fontSize: 10,
-                                    }}
-                                    onClick={() =>
-                                      handleStaffBatchAction(ord, "log_sewing")
-                                    }
-                                  >
-                                    +50 Pieces Sewn
-                                  </button>
-                                )}
-                                {(user.role === "quality_control" ||
-                                  user.role === "production_manager") && (
-                                  <button
-                                    type="button"
-                                    className="button button-dark"
-                                    style={{
-                                      minHeight: 36,
-                                      padding: "0 12px",
-                                      fontSize: 10,
-                                    }}
-                                    onClick={() =>
-                                      handleStaffBatchAction(ord, "pass_qc")
-                                    }
-                                  >
-                                    ✓ Pass +50 QC Units
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  className="mkp-inline-btn"
-                                  onClick={() => {
-                                    setSelectedOrder(ord);
-                                    setTicketOpen(true);
-                                  }}
-                                >
-                                  Job Ticket 🖨
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {(activeSection === "overview" || activeSection === "inventory") && (
-              <div className="workspace-panel">
-                <div className="panel-header-row">
-                  <div>
-                    <h3>
-                      Fabric &amp; Trim Store Lookup ({displayedInventory.length})
-                    </h3>
-                    <p>
-                      Inspect material batch lots, stock levels, and cutting
-                      runway for active runs.
-                    </p>
+                                Ticket
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div
-                  tabIndex={0}
-                  role="region"
-                  aria-label="Staff fabric store lookup table"
-                  className="table-wrapper"
-                >
-                  <table
-                    className="size-chart responsive-data-table"
-                    style={
-                      {
-                        "--label-1": "Material & Batch",
-                        "--label-2": "Category",
-                        "--label-3": "Stock & Runway",
-                      } as React.CSSProperties
-                    }
-                  >
-                    <thead>
-                      <tr>
-                        <th>Material &amp; Batch</th>
-                        <th>Category</th>
-                        <th>Stock &amp; Runway</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayedInventory.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={3}
-                            style={{
-                              textAlign: "center",
-                              padding: 20,
-                              color: "var(--muted)",
-                            }}
-                          >
-                            No fabric or trim SKUs registered in inventory yet.
-                          </td>
-                        </tr>
-                      ) : (
-                        displayedInventory.map((item) => {
+
+                  {/* Compact Material Readiness Card */}
+                  <div className="workspace-panel">
+                    <div className="panel-header-row">
+                      <div>
+                        <h3>Materials &amp; Batch Readiness</h3>
+                        <p>
+                          Quick view of fabric rolls and trims on the cutting
+                          floor.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="mkp-inline-btn"
+                        onClick={() => setActiveSection("inventory")}
+                      >
+                        Browse all materials ({inventory.length}) →
+                      </button>
+                    </div>
+                    {inventory.length === 0 ? (
+                      <div className="console-empty-state">
+                        <p>No materials registered in plant stock yet.</p>
+                      </div>
+                    ) : (
+                      <div className="summary-list">
+                        {inventory.slice(0, 4).map((item) => {
                           const days =
                             item.stockLevel / Math.max(1, item.dailyBurnRate);
                           return (
-                            <tr key={item.id}>
-                              <th>
-                                <div>{item.name}</div>
+                            <div key={item.id} className="summary-list-row">
+                              <div className="summary-list-primary">
+                                <div className="summary-row-title">
+                                  <strong>{item.name}</strong>
+                                  <span className="mono summary-muted-code">
+                                    {item.sku}
+                                  </span>
+                                </div>
+                                <div className="summary-row-sub">
+                                  {item.category} · Batch {item.batchLot}
+                                </div>
+                              </div>
+                              <div className="summary-list-actions mono">
+                                <span>
+                                  {item.stockLevel.toLocaleString()} {item.unit}
+                                </span>
                                 <span
-                                  className="mono"
+                                  className={`mkp-badge ${
+                                    days < 14
+                                      ? "mkp-badge-warn"
+                                      : "mkp-badge-olive"
+                                  }`}
+                                >
+                                  {days.toFixed(0)}d runway
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {activeSection === "orders" && (
+                <div className="workspace-panel">
+                  <div className="panel-header-row">
+                    <div className="panel-filter-bar">
+                      <input
+                        type="search"
+                        aria-label="Search orders by job code or client"
+                        placeholder="Search job code, brand, garment..."
+                        value={orderSearch}
+                        onChange={(e) => setOrderSearch(e.target.value)}
+                        className="table-select"
+                        style={{ minWidth: 220 }}
+                      />
+                      <button
+                        type="button"
+                        className="mkp-inline-btn"
+                        onClick={() => setShowAllFloorRuns((v) => !v)}
+                      >
+                        {showAllFloorRuns
+                          ? `My Assigned Only (${myAssignedOrders.length})`
+                          : `Show All Plant Orders (${orders.length})`}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    tabIndex={0}
+                    role="region"
+                    aria-label="Assigned production orders table"
+                    className="table-wrapper"
+                  >
+                    <table
+                      className="size-chart responsive-data-table"
+                      style={
+                        {
+                          "--label-1": "Order & Client",
+                          "--label-2": "Garment & Volume",
+                          "--label-3": "Stage",
+                          "--label-4": "Assigned Leads",
+                          "--label-5": "Floor Progress",
+                          "--label-6": "Actions",
+                        } as React.CSSProperties
+                      }
+                    >
+                      <thead>
+                        <tr>
+                          <th>Order &amp; Client</th>
+                          <th>Garment &amp; Volume</th>
+                          <th>Stage</th>
+                          <th>Assigned Leads</th>
+                          <th>Floor Progress</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayedStaffOrders.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={6}
+                              style={{
+                                textAlign: "center",
+                                padding: 24,
+                                color: "var(--muted)",
+                              }}
+                            >
+                              No matching production runs found.
+                            </td>
+                          </tr>
+                        ) : (
+                          displayedStaffOrders.map((ord) => (
+                            <tr key={ord.jobCode}>
+                              <th>
+                                <div className="mono">{ord.jobCode}</div>
+                                <div style={{ fontWeight: 600 }}>
+                                  {ord.company}
+                                </div>
+                              </th>
+                              <td>
+                                <div>{ord.garmentCategory}</div>
+                                <div className="mono" style={{ fontSize: 11 }}>
+                                  <strong>
+                                    {ord.exactQuantity.toLocaleString()} pcs
+                                  </strong>{" "}
+                                  · Due {ord.targetDeliveryDate}
+                                </div>
+                              </td>
+                              <td>
+                                <span className="mkp-badge mkp-badge-olive">
+                                  {STAGE_METADATA[ord.stage].stepNumber}.{" "}
+                                  {STAGE_METADATA[ord.stage].shortLabel}
+                                </span>
+                              </td>
+                              <td style={{ fontSize: 11 }}>
+                                <div>
+                                  <strong>Pattern:</strong>{" "}
+                                  {ord.assignedPatternDesigner}
+                                </div>
+                                <div>
+                                  <strong>Tailor:</strong>{" "}
+                                  {ord.assignedTailorLead}
+                                </div>
+                                <div>
+                                  <strong>QC:</strong> {ord.assignedQcInspector}
+                                </div>
+                              </td>
+                              <td className="mono" style={{ fontSize: 11.5 }}>
+                                <div>
+                                  Sewn: <strong>{ord.unitsSewn}</strong> /{" "}
+                                  {ord.exactQuantity}
+                                </div>
+                                <div style={{ color: "var(--ink)" }}>
+                                  QC Passed:{" "}
+                                  <strong>{ord.unitsPassedQc}</strong> pcs
+                                </div>
+                              </td>
+                              <td>
+                                <div
                                   style={{
-                                    fontSize: 10,
-                                    fontWeight: 400,
-                                    color: "var(--muted)",
+                                    display: "flex",
+                                    gap: 6,
+                                    flexWrap: "wrap",
                                   }}
                                 >
-                                  {item.sku} · Batch: {item.batchLot}
-                                </span>
-                              </th>
-                              <td>{item.category}</td>
-                              <td className="mono">
-                                <strong>
-                                  {item.stockLevel.toLocaleString()} {item.unit}
-                                </strong>{" "}
-                                ({days.toFixed(1)} days runway)
+                                  {renderStaffActionBtn(ord)}
+                                  <button
+                                    type="button"
+                                    className="mkp-inline-btn"
+                                    onClick={() => {
+                                      setSelectedOrder(ord);
+                                      setTicketOpen(true);
+                                    }}
+                                  >
+                                    Ticket 🖨
+                                  </button>
+                                </div>
                               </td>
                             </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </>
-        ) : (
-          /* ADMIN / PLANT MANAGER VIEW: FULL CRUD FOR ORDERS, ROSTER & INVENTORY */
-          <>
-            {/* 1. PRODUCTION ORDERS CRUD PANEL */}
-            {(activeSection === "overview" || activeSection === "orders") && (
-              <div className="workspace-panel" style={{ marginBottom: 24 }}>
-                <div className="panel-header-row">
-                  <div>
-                    <h3>
-                      Production Runs CRUD — {activeBranch?.name || "Lagos Plant"} (
-                      {orders.length} Runs)
-                    </h3>
-                    <p>
-                      Create new B2B production orders, advance stages, edit
-                      specifications &amp; pricing, or delete cancelled runs.
-                    </p>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
-                  <button
-                    type="button"
-                    className="button button-dark"
-                    style={{ minHeight: 40 }}
-                    onClick={() => setCreateOrderModalOpen(true)}
-                  >
-                    + Create Production Order
-                  </button>
                 </div>
+              )}
 
-                <div
-                  tabIndex={0}
-                  role="region"
-                  aria-label="Branch production orders CRUD table"
-                  className="table-wrapper"
-                >
-                  <table
-                    className="size-chart responsive-data-table"
-                    style={
-                      {
-                        "--label-1": "Job Code & Brand",
-                        "--label-2": "Garment & Value",
-                        "--label-3": "Stage",
-                        "--label-4": "Assigned Leads",
-                        "--label-5": "Floor Progress",
-                        "--label-6": "CRUD Actions",
-                      } as React.CSSProperties
-                    }
+              {activeSection === "inventory" && (
+                <div className="workspace-panel">
+                  <div className="panel-header-row">
+                    <div className="panel-filter-bar">
+                      <input
+                        type="search"
+                        aria-label="Search materials"
+                        placeholder="Search SKU, fabric, or supplier..."
+                        value={inventorySearch}
+                        onChange={(e) => setInventorySearch(e.target.value)}
+                        className="table-select"
+                        style={{ minWidth: 220 }}
+                      />
+                    </div>
+                  </div>
+                  <div
+                    tabIndex={0}
+                    role="region"
+                    aria-label="Materials lookup table"
+                    className="table-wrapper"
                   >
-                    <thead>
-                      <tr>
-                        <th>Job Code &amp; Brand</th>
-                        <th>Garment &amp; Value</th>
-                        <th>Stage</th>
-                        <th>Assigned Leads</th>
-                        <th>Floor Progress</th>
-                        <th>CRUD Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orders.length === 0 ? (
+                    <table
+                      className="size-chart responsive-data-table"
+                      style={
+                        {
+                          "--label-1": "Material & Batch",
+                          "--label-2": "Category",
+                          "--label-3": "Stock & Runway",
+                        } as React.CSSProperties
+                      }
+                    >
+                      <thead>
                         <tr>
-                          <td
-                            colSpan={6}
-                            style={{
-                              textAlign: "center",
-                              padding: 20,
-                              color: "var(--muted)",
-                            }}
-                          >
-                            No active production orders yet. Click{" "}
-                            <strong>+ Create Production Order</strong> to start a
-                            new B2B run.
-                          </td>
+                          <th>Material &amp; Batch</th>
+                          <th>Category</th>
+                          <th>Stock &amp; Runway</th>
                         </tr>
-                      ) : (
-                        orders.map((ord) => (
-                          <tr key={ord.jobCode}>
-                            <th>
-                              <div className="mono">{ord.jobCode}</div>
-                              <div style={{ fontWeight: 600 }}>{ord.company}</div>
-                              <div
-                                style={{
-                                  fontSize: 10,
-                                  fontWeight: 400,
-                                  color: "var(--muted)",
-                                }}
-                              >
-                                Due: {ord.targetDeliveryDate}
-                              </div>
-                            </th>
-                            <td>
-                              <div>{ord.garmentCategory}</div>
-                              <div className="mono" style={{ fontSize: 11 }}>
-                                <strong>
-                                  {ord.exactQuantity.toLocaleString()} pcs
-                                </strong>{" "}
-                                · ₦{ord.totalQuoteNgn.toLocaleString()}
-                              </div>
+                      </thead>
+                      <tbody>
+                        {displayedInventory.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={3}
+                              style={{
+                                textAlign: "center",
+                                padding: 24,
+                                color: "var(--muted)",
+                              }}
+                            >
+                              No matching materials found in stock.
                             </td>
-                            <td>
+                          </tr>
+                        ) : (
+                          displayedInventory.map((item) => {
+                            const days =
+                              item.stockLevel / Math.max(1, item.dailyBurnRate);
+                            return (
+                              <tr key={item.id}>
+                                <th>
+                                  <div>{item.name}</div>
+                                  <span
+                                    className="mono"
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: 400,
+                                      color: "var(--muted)",
+                                    }}
+                                  >
+                                    {item.sku} · Batch {item.batchLot}
+                                  </span>
+                                </th>
+                                <td>{item.category}</td>
+                                <td className="mono">
+                                  <strong>
+                                    {item.stockLevel.toLocaleString()}{" "}
+                                    {item.unit}
+                                  </strong>{" "}
+                                  ({days.toFixed(1)} days runway)
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            /* ==================== ADMIN / PLANT CONSOLE VIEWS ==================== */
+            <>
+              {/* VIEW 1: CALM SCANNABLE PLANT OVERVIEW */}
+              {activeSection === "overview" && (
+                <>
+                  <div className="kpi-grid-4">
+                    <div className="kpi-card">
+                      <span className="ticket-label">PIPELINE REVENUE</span>
+                      <div className="kpi-value mono">
+                        ₦{branchRevenue.toLocaleString()}
+                      </div>
+                      <div className="kpi-sub">
+                        {orders.length} active production orders
+                      </div>
+                    </div>
+
+                    <div className="kpi-card">
+                      <span className="ticket-label">EST. GROSS MARGIN</span>
+                      <div
+                        className="kpi-value mono"
+                        style={{ color: "var(--ink)" }}
+                      >
+                        ₦{branchGrossProfit.toLocaleString()}
+                      </div>
+                      <div className="kpi-sub">58% target plant margin</div>
+                    </div>
+
+                    <div className="kpi-card">
+                      <span className="ticket-label">PLANT TEAM</span>
+                      <div className="kpi-value mono">
+                        {branchStaff.length} Members
+                      </div>
+                      <div className="kpi-sub">
+                        {clockedInCount} currently clocked in
+                      </div>
+                    </div>
+
+                    <div className="kpi-card">
+                      <span className="ticket-label">STOCK ALERTS</span>
+                      <div className="kpi-value mono">
+                        {lowStockItems.length} Low
+                      </div>
+                      <div className="kpi-sub">
+                        Materials under 14-day runway
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recent Production Orders Summary Card (max 5 rows) */}
+                  <div className="workspace-panel" style={{ marginBottom: 24 }}>
+                    <div className="panel-header-row">
+                      <div>
+                        <h3>Recent Production Orders</h3>
+                        <p>
+                          Latest client runs and floor stage progress for{" "}
+                          {activeBranch?.name || "this plant"}.
+                        </p>
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          className="mkp-inline-btn"
+                          onClick={() => setActiveSection("orders")}
+                        >
+                          Manage all orders ({orders.length}) →
+                        </button>
+                      </div>
+                    </div>
+
+                    {orders.length === 0 ? (
+                      <div className="console-empty-state">
+                        <p>
+                          No active production orders yet for{" "}
+                          {activeBranch?.name || "this plant"}.
+                        </p>
+                        <button
+                          type="button"
+                          className="button button-dark"
+                          style={{ minHeight: 38 }}
+                          onClick={() => setCreateOrderModalOpen(true)}
+                        >
+                          + Create First Order
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="summary-list">
+                        {orders.slice(0, 5).map((ord) => (
+                          <div key={ord.jobCode} className="summary-list-row">
+                            <div className="summary-list-primary">
+                              <div className="summary-row-title">
+                                <span className="mono">{ord.jobCode}</span>
+                                <strong>{ord.company}</strong>
+                                <span className="mkp-badge mkp-badge-olive">
+                                  {STAGE_METADATA[ord.stage].stepNumber}.{" "}
+                                  {STAGE_METADATA[ord.stage].shortLabel}
+                                </span>
+                              </div>
+                              <div className="summary-row-sub">
+                                {ord.garmentCategory} ·{" "}
+                                {ord.exactQuantity.toLocaleString()} pcs · ₦
+                                {ord.totalQuoteNgn.toLocaleString()} · Due{" "}
+                                {ord.targetDeliveryDate}
+                              </div>
+                            </div>
+                            <div className="summary-list-actions">
                               <select
                                 aria-label={`Stage for ${ord.jobCode}`}
                                 className="table-select"
@@ -1636,273 +1698,577 @@ export default function RoleDashboardPage() {
                                   )
                                 )}
                               </select>
-                            </td>
-                            <td style={{ fontSize: 11 }}>
-                              <div>
-                                <strong>Pattern:</strong>{" "}
-                                {ord.assignedPatternDesigner}
-                              </div>
-                              <div>
-                                <strong>Tailor:</strong> {ord.assignedTailorLead}
-                              </div>
-                              <div>
-                                <strong>QC:</strong> {ord.assignedQcInspector}
-                              </div>
-                            </td>
-                            <td className="mono" style={{ fontSize: 11 }}>
-                              <div>
-                                Sewn: <strong>{ord.unitsSewn}</strong> /{" "}
-                                {ord.exactQuantity}
-                              </div>
-                              <div style={{ color: "var(--ink)" }}>
-                                QC Passed: <strong>{ord.unitsPassedQc}</strong>{" "}
-                                pcs
-                              </div>
-                            </td>
-                            <td>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  gap: 6,
-                                  flexWrap: "wrap",
+                              <button
+                                type="button"
+                                className="mkp-inline-btn"
+                                onClick={() => {
+                                  setSelectedOrder(ord);
+                                  setTicketOpen(true);
                                 }}
                               >
-                                <button
-                                  type="button"
-                                  className="mkp-inline-btn"
-                                  onClick={() => setEditingOrder(ord)}
+                                Ticket
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Scannable 2-Card Operational Snapshot (Zero cramped side-by-side CRUD tables) */}
+                  <div className="overview-summary-grid">
+                    {/* Card A: Materials & Stock Health */}
+                    <div className="workspace-panel">
+                      <div className="panel-header-row">
+                        <div>
+                          <h3>Materials &amp; Stock Health</h3>
+                          <p>
+                            {lowStockItems.length > 0
+                              ? `${lowStockItems.length} material(s) under 14-day cutting runway.`
+                              : "All registered fabrics and trims have healthy runway."}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="mkp-inline-btn"
+                          onClick={() => setActiveSection("inventory")}
+                        >
+                          Manage stock →
+                        </button>
+                      </div>
+
+                      {inventory.length === 0 ? (
+                        <div className="console-empty-state">
+                          <p>No fabric rolls or trim SKUs registered yet.</p>
+                          <button
+                            type="button"
+                            className="mkp-inline-btn"
+                            onClick={() => setCreateSkuModalOpen(true)}
+                          >
+                            + Add first material
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="summary-list">
+                          {(lowStockItems.length > 0
+                            ? lowStockItems
+                            : inventory
+                          )
+                            .slice(0, 4)
+                            .map((item) => {
+                              const days =
+                                item.stockLevel /
+                                Math.max(1, item.dailyBurnRate);
+                              return (
+                                <div
+                                  key={item.id}
+                                  className="summary-list-row"
                                 >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  className="mkp-inline-btn"
-                                  onClick={() => {
-                                    setSelectedOrder(ord);
-                                    setTicketOpen(true);
+                                  <div className="summary-list-primary">
+                                    <div className="summary-row-title">
+                                      <strong>{item.name}</strong>
+                                    </div>
+                                    <div className="summary-row-sub mono">
+                                      {item.sku} ·{" "}
+                                      {item.stockLevel.toLocaleString()}{" "}
+                                      {item.unit}
+                                    </div>
+                                  </div>
+                                  <div className="summary-list-actions">
+                                    <span
+                                      className={`mkp-badge ${
+                                        days < 7
+                                          ? "mkp-badge-critical"
+                                          : days < 14
+                                          ? "mkp-badge-warn"
+                                          : "mkp-badge-olive"
+                                      }`}
+                                    >
+                                      {days.toFixed(0)}d left
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="mkp-inline-btn"
+                                      onClick={() =>
+                                        handleQuickRestockSku(item, 100)
+                                      }
+                                    >
+                                      +100
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Card B: Plant Team & Shift Summary */}
+                    <div className="workspace-panel">
+                      <div className="panel-header-row">
+                        <div>
+                          <h3>Plant Team &amp; Shifts</h3>
+                          <p>
+                            {clockedInCount} of {branchStaff.length} team
+                            members active on shift.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="mkp-inline-btn"
+                          onClick={() => setActiveSection("roster")}
+                        >
+                          Manage team →
+                        </button>
+                      </div>
+
+                      {branchStaff.length === 0 ? (
+                        <div className="console-empty-state">
+                          <p>No team members assigned to this plant yet.</p>
+                          <button
+                            type="button"
+                            className="mkp-inline-btn"
+                            onClick={() => setCreateStaffModalOpen(true)}
+                          >
+                            + Add team member
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="summary-list">
+                          {branchStaff.slice(0, 4).map((sp) => (
+                            <div key={sp.id} className="summary-list-row">
+                              <div className="summary-list-primary">
+                                <div className="summary-row-title">
+                                  <strong>{sp.name}</strong>
+                                  <span className="size-pill-item">
+                                    {ARTISAN_ROLE_LABELS[sp.role]}
+                                  </span>
+                                </div>
+                                <div className="summary-row-sub">
+                                  {sp.station} · {sp.qcPassRate.toFixed(1)}% QC
+                                </div>
+                              </div>
+                              <div className="summary-list-actions mono">
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    color:
+                                      sp.shiftStatus === "CLOCKED_IN"
+                                        ? "var(--ink)"
+                                        : "var(--muted)",
                                   }}
                                 >
-                                  Ticket 🖨
-                                </button>
-                                <button
-                                  type="button"
-                                  className="mkp-inline-btn"
-                                  style={{ color: "#9e2a2b" }}
-                                  onClick={() => handleDeleteOrder(ord)}
-                                >
-                                  Delete
-                                </button>
+                                  {sp.shiftStatus === "CLOCKED_IN"
+                                    ? "● On Shift"
+                                    : "○ Off Shift"}
+                                </span>
                               </div>
-                            </td>
-                          </tr>
-                        ))
+                            </div>
+                          ))}
+                        </div>
                       )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+                    </div>
+                  </div>
+                </>
+              )}
 
-            {/* 2. ADMIN/STAFF ROSTER CRUD + INVENTORY CRUD */}
-            <div
-              className={
-                activeSection === "overview" ? "dashboard-split-grid" : ""
-              }
-            >
-              {(activeSection === "overview" || activeSection === "roster") && (
+              {/* VIEW 2: FULL-WIDTH PRODUCTION ORDERS */}
+              {activeSection === "orders" && (
                 <div className="workspace-panel">
                   <div className="panel-header-row">
-                    <div>
-                      <h3>
-                        Branch Admins &amp; Specialists CRUD ({branchStaff.length})
-                      </h3>
-                      <p>
-                        Create, edit, or remove Plant Admins, Pattern Designers,
-                        Tailors &amp; QC Inspectors.
-                      </p>
+                    <div className="panel-filter-bar">
+                      <input
+                        type="search"
+                        aria-label="Search orders"
+                        placeholder="Search job code, brand, or category..."
+                        value={orderSearch}
+                        onChange={(e) => setOrderSearch(e.target.value)}
+                        className="table-select"
+                        style={{ minWidth: 240 }}
+                      />
+                      <span
+                        className="mono"
+                        style={{ fontSize: 11, color: "var(--muted)" }}
+                      >
+                        Showing {filteredAdminOrders.length} of {orders.length}{" "}
+                        orders
+                      </span>
                     </div>
-                    <button
-                      type="button"
-                      className="button button-dark"
-                      style={{ minHeight: 38 }}
-                      onClick={() => setCreateStaffModalOpen(true)}
-                    >
-                      + Add Admin / Staff
-                    </button>
                   </div>
 
                   <div
                     tabIndex={0}
                     role="region"
-                    aria-label="Facility artisan and admin CRUD table"
+                    aria-label="Production orders table"
                     className="table-wrapper"
                   >
                     <table
                       className="size-chart responsive-data-table"
                       style={
                         {
-                          "--label-1": "Specialist / Admin",
-                          "--label-2": "Tier & Role",
-                          "--label-3": "Output & QC",
-                          "--label-4": "Actions",
+                          "--label-1": "Order & Client",
+                          "--label-2": "Garment & Value",
+                          "--label-3": "Stage",
+                          "--label-4": "Assigned Leads",
+                          "--label-5": "Floor Progress",
+                          "--label-6": "Actions",
                         } as React.CSSProperties
                       }
                     >
                       <thead>
                         <tr>
-                          <th>Specialist / Admin</th>
-                          <th>Tier &amp; Role</th>
-                          <th>Output &amp; QC</th>
+                          <th>Order &amp; Client</th>
+                          <th>Garment &amp; Value</th>
+                          <th>Stage</th>
+                          <th>Assigned Leads</th>
+                          <th>Floor Progress</th>
                           <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {branchStaff.map((sp) => (
-                          <tr key={sp.id}>
-                            <th>
-                              <div>{sp.name}</div>
-                              <div
-                                className="mono"
-                                style={{
-                                  fontSize: 10,
-                                  fontWeight: 400,
-                                  color: "var(--muted)",
-                                }}
-                              >
-                                {sp.email}
-                              </div>
-                            </th>
-                            <td>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  gap: 4,
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                <span className="size-pill-item">
-                                  {sp.accessTier.toUpperCase()}
-                                </span>
-                                <span className="mkp-badge mkp-badge-olive">
-                                  {ARTISAN_ROLE_LABELS[sp.role]}
-                                </span>
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: 10.5,
-                                  color: "var(--muted)",
-                                  marginTop: 3,
-                                }}
-                              >
-                                {sp.station} ·{" "}
-                                {sp.shiftStatus === "CLOCKED_IN"
-                                  ? "● Clocked In"
-                                  : "○ Off Shift"}
-                              </div>
+                        {filteredAdminOrders.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={6}
+                              style={{
+                                textAlign: "center",
+                                padding: 24,
+                                color: "var(--muted)",
+                              }}
+                            >
+                              No production orders match this view. Click{" "}
+                              <strong>+ New Order</strong> above to create one.
                             </td>
-                            <td className="mono">
-                              <div>
-                                <strong>
-                                  {sp.unitsCompletedMonth.toLocaleString()} pcs
-                                </strong>
-                              </div>
-                              <div
-                                style={{ fontSize: 10.5, color: "var(--ink)" }}
-                              >
-                                {sp.qcPassRate.toFixed(1)}% QC
-                              </div>
-                            </td>
-                            <td>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  gap: 6,
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                <button
-                                  type="button"
-                                  className="mkp-inline-btn"
-                                  onClick={() => setEditingStaff(sp)}
+                          </tr>
+                        ) : (
+                          filteredAdminOrders.map((ord) => (
+                            <tr key={ord.jobCode}>
+                              <th>
+                                <div className="mono">{ord.jobCode}</div>
+                                <div style={{ fontWeight: 600 }}>
+                                  {ord.company}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 400,
+                                    color: "var(--muted)",
+                                  }}
                                 >
-                                  Edit
-                                </button>
-                                {sp.id !== user.id && (
+                                  Due {ord.targetDeliveryDate}
+                                </div>
+                              </th>
+                              <td>
+                                <div>{ord.garmentCategory}</div>
+                                <div className="mono" style={{ fontSize: 11 }}>
+                                  <strong>
+                                    {ord.exactQuantity.toLocaleString()} pcs
+                                  </strong>{" "}
+                                  · ₦{ord.totalQuoteNgn.toLocaleString()}
+                                </div>
+                              </td>
+                              <td>
+                                <select
+                                  aria-label={`Stage for ${ord.jobCode}`}
+                                  className="table-select"
+                                  value={ord.stage}
+                                  onChange={(e) =>
+                                    handleUpdateOrderStage(
+                                      ord.jobCode,
+                                      e.target.value as ProductionStage
+                                    )
+                                  }
+                                >
+                                  {Object.entries(STAGE_METADATA).map(
+                                    ([stKey, meta]) => (
+                                      <option key={stKey} value={stKey}>
+                                        {meta.stepNumber}. {meta.shortLabel}
+                                      </option>
+                                    )
+                                  )}
+                                </select>
+                              </td>
+                              <td style={{ fontSize: 11 }}>
+                                <div>
+                                  <strong>Pattern:</strong>{" "}
+                                  {ord.assignedPatternDesigner}
+                                </div>
+                                <div>
+                                  <strong>Tailor:</strong>{" "}
+                                  {ord.assignedTailorLead}
+                                </div>
+                                <div>
+                                  <strong>QC:</strong> {ord.assignedQcInspector}
+                                </div>
+                              </td>
+                              <td className="mono" style={{ fontSize: 11 }}>
+                                <div>
+                                  Sewn: <strong>{ord.unitsSewn}</strong> /{" "}
+                                  {ord.exactQuantity}
+                                </div>
+                                <div style={{ color: "var(--ink)" }}>
+                                  QC Passed:{" "}
+                                  <strong>{ord.unitsPassedQc}</strong> pcs
+                                </div>
+                              </td>
+                              <td>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: 6,
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  <button
+                                    type="button"
+                                    className="mkp-inline-btn"
+                                    onClick={() => setEditingOrder(ord)}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="mkp-inline-btn"
+                                    onClick={() => {
+                                      setSelectedOrder(ord);
+                                      setTicketOpen(true);
+                                    }}
+                                  >
+                                    Ticket 🖨
+                                  </button>
                                   <button
                                     type="button"
                                     className="mkp-inline-btn"
                                     style={{ color: "#9e2a2b" }}
-                                    onClick={() => handleDeleteBranchStaff(sp)}
+                                    onClick={() => handleDeleteOrder(ord)}
                                   >
                                     Delete
                                   </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
                 </div>
               )}
 
-              {(activeSection === "overview" ||
-                activeSection === "inventory") && (
+              {/* VIEW 3: FULL-WIDTH TEAM ROSTER */}
+              {activeSection === "roster" && (
                 <div className="workspace-panel">
                   <div className="panel-header-row">
-                    <div>
-                      <h3>
-                        Fabric &amp; Trim Inventory CRUD (
-                        {displayedInventory.length})
-                      </h3>
-                      <p>
-                        Manage material SKUs, stock levels, and cutting velocity
-                      </p>
-                    </div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <button
-                        type="button"
-                        className="mkp-inline-btn"
-                        onClick={() => setShowLowStockOnly((v) => !v)}
+                    <div className="panel-filter-bar">
+                      <input
+                        type="search"
+                        aria-label="Search team roster"
+                        placeholder="Search name, email, or station..."
+                        value={staffSearch}
+                        onChange={(e) => setStaffSearch(e.target.value)}
+                        className="table-select"
+                        style={{ minWidth: 240 }}
+                      />
+                      <span
+                        className="mono"
+                        style={{ fontSize: 11, color: "var(--muted)" }}
                       >
-                        {showLowStockOnly
-                          ? `Show All (${inventory.length})`
-                          : `Low Stock (${lowStockItems.length})`}
-                      </button>
-                      {isManager && (
-                        <button
-                          type="button"
-                          className="button button-dark"
-                          style={{ minHeight: 36 }}
-                          onClick={() => setCreateSkuModalOpen(true)}
-                        >
-                          + Add SKU
-                        </button>
-                      )}
+                        {filteredBranchStaff.length} team member(s)
+                      </span>
                     </div>
                   </div>
 
                   <div
                     tabIndex={0}
                     role="region"
-                    aria-label="Fabric and trim inventory CRUD table"
+                    aria-label="Plant team roster table"
                     className="table-wrapper"
                   >
                     <table
                       className="size-chart responsive-data-table"
                       style={
                         {
-                          "--label-1": "Material",
-                          "--label-2": "Stock & Runway",
-                          "--label-3": "Actions",
+                          "--label-1": "Team Member",
+                          "--label-2": "Role & Tier",
+                          "--label-3": "Station & Shift",
+                          "--label-4": "Output & QC",
+                          "--label-5": "Actions",
                         } as React.CSSProperties
                       }
                     >
                       <thead>
                         <tr>
-                          <th>Material</th>
+                          <th>Team Member</th>
+                          <th>Role &amp; Tier</th>
+                          <th>Station &amp; Shift</th>
+                          <th>Output &amp; QC</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredBranchStaff.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={5}
+                              style={{
+                                textAlign: "center",
+                                padding: 24,
+                                color: "var(--muted)",
+                              }}
+                            >
+                              No team members match your search.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredBranchStaff.map((sp) => (
+                            <tr key={sp.id}>
+                              <th>
+                                <div>{sp.name}</div>
+                                <div
+                                  className="mono"
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 400,
+                                    color: "var(--muted)",
+                                  }}
+                                >
+                                  {sp.email}
+                                </div>
+                              </th>
+                              <td>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: 6,
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  <span className="size-pill-item">
+                                    {sp.accessTier.toUpperCase()}
+                                  </span>
+                                  <span className="mkp-badge mkp-badge-olive">
+                                    {ARTISAN_ROLE_LABELS[sp.role]}
+                                  </span>
+                                </div>
+                              </td>
+                              <td>
+                                <div>{sp.station}</div>
+                                <div
+                                  className="mono"
+                                  style={{
+                                    fontSize: 10.5,
+                                    color: "var(--muted)",
+                                  }}
+                                >
+                                  {sp.shiftStatus === "CLOCKED_IN"
+                                    ? "● Clocked In"
+                                    : "○ Off Shift"}
+                                </div>
+                              </td>
+                              <td className="mono">
+                                <div>
+                                  <strong>
+                                    {sp.unitsCompletedMonth.toLocaleString()}{" "}
+                                    pcs
+                                  </strong>
+                                </div>
+                                <div
+                                  style={{ fontSize: 10.5, color: "var(--ink)" }}
+                                >
+                                  {sp.qcPassRate.toFixed(1)}% QC
+                                </div>
+                              </td>
+                              <td>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: 6,
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  <button
+                                    type="button"
+                                    className="mkp-inline-btn"
+                                    onClick={() => setEditingStaff(sp)}
+                                  >
+                                    Edit
+                                  </button>
+                                  {sp.id !== user.id && (
+                                    <button
+                                      type="button"
+                                      className="mkp-inline-btn"
+                                      style={{ color: "#9e2a2b" }}
+                                      onClick={() => handleDeleteBranchStaff(sp)}
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* VIEW 4: FULL-WIDTH MATERIALS & STOCK */}
+              {activeSection === "inventory" && (
+                <div className="workspace-panel">
+                  <div className="panel-header-row">
+                    <div className="panel-filter-bar">
+                      <input
+                        type="search"
+                        aria-label="Search materials and SKUs"
+                        placeholder="Search SKU, fabric, or supplier..."
+                        value={inventorySearch}
+                        onChange={(e) => setInventorySearch(e.target.value)}
+                        className="table-select"
+                        style={{ minWidth: 240 }}
+                      />
+                      <button
+                        type="button"
+                        className="mkp-inline-btn"
+                        style={
+                          showLowStockOnly
+                            ? { background: "var(--ink)", color: "#fff" }
+                            : undefined
+                        }
+                        onClick={() => setShowLowStockOnly((v) => !v)}
+                      >
+                        {showLowStockOnly
+                          ? `Showing Low Stock (${lowStockItems.length})`
+                          : `Filter Low Stock (${lowStockItems.length})`}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    tabIndex={0}
+                    role="region"
+                    aria-label="Materials and stock table"
+                    className="table-wrapper"
+                  >
+                    <table
+                      className="size-chart responsive-data-table"
+                      style={
+                        {
+                          "--label-1": "Material & SKU",
+                          "--label-2": "Category & Supplier",
+                          "--label-3": "Stock & Runway",
+                          "--label-4": "Unit Cost",
+                          "--label-5": "Actions",
+                        } as React.CSSProperties
+                      }
+                    >
+                      <thead>
+                        <tr>
+                          <th>Material &amp; SKU</th>
+                          <th>Category &amp; Supplier</th>
                           <th>Stock &amp; Runway</th>
+                          <th>Unit Cost</th>
                           <th>Actions</th>
                         </tr>
                       </thead>
@@ -1910,22 +2276,22 @@ export default function RoleDashboardPage() {
                         {displayedInventory.length === 0 ? (
                           <tr>
                             <td
-                              colSpan={3}
+                              colSpan={5}
                               style={{
                                 textAlign: "center",
-                                padding: 20,
+                                padding: 24,
                                 color: "var(--muted)",
                               }}
                             >
-                              No fabric or trim SKUs added yet. Click{" "}
-                              <strong>+ Add SKU</strong> to register materials.
+                              No materials match this filter. Click{" "}
+                              <strong>+ Add Material</strong> above to register
+                              stock.
                             </td>
                           </tr>
                         ) : (
                           displayedInventory.map((item) => {
                             const days =
-                              item.stockLevel /
-                              Math.max(1, item.dailyBurnRate);
+                              item.stockLevel / Math.max(1, item.dailyBurnRate);
                             return (
                               <tr key={item.id}>
                                 <th>
@@ -1933,14 +2299,25 @@ export default function RoleDashboardPage() {
                                   <span
                                     className="mono"
                                     style={{
-                                      fontSize: 10,
+                                      fontSize: 10.5,
                                       fontWeight: 400,
                                       color: "var(--muted)",
                                     }}
                                   >
-                                    {item.sku} · {item.supplierName}
+                                    {item.sku} · Batch {item.batchLot}
                                   </span>
                                 </th>
+                                <td>
+                                  <div>{item.category}</div>
+                                  <div
+                                    style={{
+                                      fontSize: 11,
+                                      color: "var(--muted)",
+                                    }}
+                                  >
+                                    {item.supplierName}
+                                  </div>
+                                </td>
                                 <td className="mono">
                                   <div>
                                     <strong>
@@ -1960,6 +2337,10 @@ export default function RoleDashboardPage() {
                                     {days.toFixed(1)} days left
                                   </span>
                                 </td>
+                                <td className="mono">
+                                  ₦{item.costPerUnitNgn.toLocaleString()} /{" "}
+                                  {item.unit}
+                                </td>
                                 <td>
                                   <div
                                     style={{
@@ -1968,30 +2349,34 @@ export default function RoleDashboardPage() {
                                       flexWrap: "wrap",
                                     }}
                                   >
-                                    <button
-                                      type="button"
-                                      className="mkp-inline-btn"
-                                      onClick={() =>
-                                        handleQuickRestockSku(item, 100)
-                                      }
-                                    >
-                                      +100
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="mkp-inline-btn"
-                                      onClick={() => setEditingSku(item)}
-                                    >
-                                      Edit
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="mkp-inline-btn"
-                                      style={{ color: "#9e2a2b" }}
-                                      onClick={() => handleDeleteSku(item)}
-                                    >
-                                      Delete
-                                    </button>
+                                    {isManager && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          className="mkp-inline-btn"
+                                          onClick={() =>
+                                            handleQuickRestockSku(item, 100)
+                                          }
+                                        >
+                                          +100
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="mkp-inline-btn"
+                                          onClick={() => setEditingSku(item)}
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="mkp-inline-btn"
+                                          style={{ color: "#9e2a2b" }}
+                                          onClick={() => handleDeleteSku(item)}
+                                        >
+                                          Delete
+                                        </button>
+                                      </>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -2003,9 +2388,8 @@ export default function RoleDashboardPage() {
                   </div>
                 </div>
               )}
-            </div>
-          </>
-        )}
+            </>
+          )}
         </section>
       </div>
 
@@ -2019,7 +2403,7 @@ export default function RoleDashboardPage() {
       <ModalDialog
         open={createOrderModalOpen}
         onClose={() => setCreateOrderModalOpen(false)}
-        title="Create New B2B Production Run"
+        title="New Production Order"
         maxWidth={560}
       >
         <form
@@ -2143,7 +2527,7 @@ export default function RoleDashboardPage() {
               className="button button-dark"
               style={{ flex: 1 }}
             >
-              Create Production Order
+              Create Order
             </button>
             <button
               type="button"
@@ -2161,7 +2545,7 @@ export default function RoleDashboardPage() {
       <ModalDialog
         open={Boolean(editingOrder)}
         onClose={() => setEditingOrder(null)}
-        title={`Edit Production Order — ${editingOrder?.jobCode || ""}`}
+        title={`Edit Order — ${editingOrder?.jobCode || ""}`}
         maxWidth={580}
       >
         {editingOrder && (
@@ -2363,7 +2747,7 @@ export default function RoleDashboardPage() {
                 className="button button-dark"
                 style={{ flex: 1 }}
               >
-                Save Order Changes
+                Save Changes
               </button>
               <button
                 type="button"
@@ -2378,11 +2762,11 @@ export default function RoleDashboardPage() {
         )}
       </ModalDialog>
 
-      {/* CREATE ADMIN / SPECIALIST MODAL */}
+      {/* CREATE TEAM MEMBER MODAL */}
       <ModalDialog
         open={createStaffModalOpen}
         onClose={() => setCreateStaffModalOpen(false)}
-        title={`Add Admin or Specialist — ${activeBranch?.name || "Lagos Plant"}`}
+        title={`Add Team Member — ${activeBranch?.name || "Lagos Plant"}`}
         maxWidth={540}
       >
         <form
@@ -2392,7 +2776,7 @@ export default function RoleDashboardPage() {
         >
           <div className="form-row">
             <label>
-              Access Tier (RBAC) *
+              Access Level *
               <select
                 name="accessTier"
                 value={newStaffForm.accessTier}
@@ -2403,15 +2787,15 @@ export default function RoleDashboardPage() {
                   }))
                 }
               >
-                <option value="admin">Admin (Factory Plant Manager)</option>
                 <option value="staff">Staff (Artisan / Specialist)</option>
+                <option value="admin">Admin (Plant Manager)</option>
                 {isSuper && (
                   <option value="superadmin">Superadmin (Global HQ)</option>
                 )}
               </select>
             </label>
             <label>
-              Specialist Role *
+              Role *
               <select
                 name="role"
                 value={newStaffForm.role}
@@ -2466,7 +2850,7 @@ export default function RoleDashboardPage() {
               <input
                 name="station"
                 required
-                placeholder="e.g. Planning Office 1 or Sewing Line 2"
+                placeholder="e.g. Sewing Line 2"
                 value={newStaffForm.station}
                 onChange={(e) =>
                   setNewStaffForm((p) => ({ ...p, station: e.target.value }))
@@ -2486,7 +2870,7 @@ export default function RoleDashboardPage() {
                   marginBottom: 4,
                 }}
               >
-                8+ characters (optional — staff can also use OTP Reset Password)
+                8+ characters (optional)
               </span>
               <input
                 name="password"
@@ -2511,7 +2895,7 @@ export default function RoleDashboardPage() {
                   marginBottom: 4,
                 }}
               >
-                Assigned machinery, QA scope, or CAD focus
+                Assigned machinery or QA scope
               </span>
               <input
                 name="specialty"
@@ -2528,7 +2912,7 @@ export default function RoleDashboardPage() {
               className="button button-dark"
               style={{ flex: 1 }}
             >
-              Add Account to Roster
+              Add Team Member
             </button>
             <button
               type="button"
@@ -2542,14 +2926,14 @@ export default function RoleDashboardPage() {
         </form>
       </ModalDialog>
 
-      {/* EDIT ADMIN / SPECIALIST MODAL */}
+      {/* EDIT TEAM MEMBER MODAL */}
       <ModalDialog
         open={Boolean(editingStaff)}
         onClose={() => {
           setEditStaffPassword("");
           setEditingStaff(null);
         }}
-        title={`Edit Account — ${editingStaff?.name || ""}`}
+        title={`Edit Team Member — ${editingStaff?.name || ""}`}
         maxWidth={540}
       >
         {editingStaff && (
@@ -2560,7 +2944,7 @@ export default function RoleDashboardPage() {
           >
             <div className="form-row">
               <label>
-                Access Tier (RBAC) *
+                Access Level *
                 <select
                   name="accessTier"
                   value={editingStaff.accessTier}
@@ -2571,7 +2955,7 @@ export default function RoleDashboardPage() {
                     })
                   }
                 >
-                  <option value="admin">Admin (Factory Plant Manager)</option>
+                  <option value="admin">Admin (Plant Manager)</option>
                   <option value="staff">Staff (Artisan / Specialist)</option>
                   {isSuper && (
                     <option value="superadmin">Superadmin (Global HQ)</option>
@@ -2579,7 +2963,7 @@ export default function RoleDashboardPage() {
                 </select>
               </label>
               <label>
-                Specialist Role *
+                Role *
                 <select
                   name="role"
                   value={editingStaff.role}
@@ -2696,7 +3080,7 @@ export default function RoleDashboardPage() {
               </label>
             </div>
             <label>
-              Set / Reset Sign-In Password (Optional)
+              Reset Sign-In Password (Optional)
               <span
                 style={{
                   display: "block",
@@ -2706,15 +3090,7 @@ export default function RoleDashboardPage() {
                   marginBottom: 4,
                 }}
               >
-                Minimum 8 characters — clears any failed-login lockout, or{" "}
-                <Link
-                  href={`/reset-password?email=${encodeURIComponent(
-                    editingStaff.email
-                  )}`}
-                  style={{ textDecoration: "underline", color: "var(--ink)" }}
-                >
-                  open OTP recovery
-                </Link>
+                8+ characters — clears any failed-login lockout
               </span>
               <input
                 name="password"
@@ -2732,7 +3108,7 @@ export default function RoleDashboardPage() {
                 className="button button-dark"
                 style={{ flex: 1 }}
               >
-                Save Account Changes
+                Save Changes
               </button>
               <button
                 type="button"
@@ -2750,11 +3126,11 @@ export default function RoleDashboardPage() {
         )}
       </ModalDialog>
 
-      {/* CREATE MATERIAL SKU MODAL */}
+      {/* CREATE MATERIAL MODAL */}
       <ModalDialog
         open={createSkuModalOpen}
         onClose={() => setCreateSkuModalOpen(false)}
-        title="Add New Fabric or Trim SKU"
+        title="Add Fabric or Trim Material"
         maxWidth={540}
       >
         <form
@@ -2895,7 +3271,7 @@ export default function RoleDashboardPage() {
               className="button button-dark"
               style={{ flex: 1 }}
             >
-              Add Material SKU
+              Add Material
             </button>
             <button
               type="button"
@@ -2909,11 +3285,11 @@ export default function RoleDashboardPage() {
         </form>
       </ModalDialog>
 
-      {/* EDIT MATERIAL SKU MODAL */}
+      {/* EDIT MATERIAL MODAL */}
       <ModalDialog
         open={Boolean(editingSku)}
         onClose={() => setEditingSku(null)}
-        title={`Edit Material SKU — ${editingSku?.sku || ""}`}
+        title={`Edit Material — ${editingSku?.sku || ""}`}
         maxWidth={540}
       >
         {editingSku && (
@@ -3018,7 +3394,7 @@ export default function RoleDashboardPage() {
                 className="button button-dark"
                 style={{ flex: 1 }}
               >
-                Save SKU Changes
+                Save Changes
               </button>
               <button
                 type="button"

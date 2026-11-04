@@ -1,18 +1,46 @@
-import { NextResponse } from "next/server";
-import { executeNeonSql, getNeonConnectionString } from "../../../lib/neon-clerk";
+import { NextRequest, NextResponse } from "next/server";
+import {
+  guardSameOriginMutation,
+  requireAuthenticatedSession,
+} from "../../../lib/auth-server";
+import {
+  executeSqlQuery,
+  getDatabaseConnectionString,
+} from "../../../lib/database";
 import { FactoryBranch, INITIAL_BRANCHES } from "../../../lib/production-os";
+import {
+  attachRateLimitHeaders,
+  enforceRequestRateLimit,
+  RATE_LIMIT_PROFILES,
+} from "../../../lib/rate-limit";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const rateCheck = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.adminRead
+  );
+  if (rateCheck.blocked) return rateCheck.blocked;
+
+  const auth = await requireAuthenticatedSession(request, [
+    "superadmin",
+    "admin",
+    "staff",
+  ]);
+  if (auth.denied) return attachRateLimitHeaders(auth.denied, rateCheck.result);
+
   try {
-    if (!getNeonConnectionString()) {
-      return NextResponse.json({
-        ok: true,
-        source: "hybrid_edge",
-        branches: INITIAL_BRANCHES,
-      });
+    if (!getDatabaseConnectionString()) {
+      return attachRateLimitHeaders(
+        NextResponse.json({
+          ok: true,
+          source: "local_hybrid",
+          branches: INITIAL_BRANCHES,
+        }),
+        rateCheck.result
+      );
     }
 
-    const { rows } = await executeNeonSql<Record<string, any>>(
+    const { rows } = await executeSqlQuery<Record<string, any>>(
       `SELECT
         id, name, location, specialization, machine_count, staff_count,
         fabric_meters_stock, net_revenue_ngn, operating_expenses_ngn, true_net_profit_ngn, status
@@ -34,24 +62,42 @@ export async function GET() {
       status: r.status === "MAINTENANCE" ? "MAINTENANCE" : "ACTIVE",
     }));
 
-    return NextResponse.json({
-      ok: true,
-      source: "neon_postgres",
-      branches,
-    });
+    return attachRateLimitHeaders(
+      NextResponse.json({
+        ok: true,
+        source: "postgresql",
+        branches,
+      }),
+      rateCheck.result
+    );
   } catch (err: any) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: err?.message || "Failed to load branches.",
-        branches: INITIAL_BRANCHES,
-      },
-      { status: 200 }
+    return attachRateLimitHeaders(
+      NextResponse.json(
+        {
+          ok: false,
+          error: err?.message || "Failed to load branches.",
+          branches: INITIAL_BRANCHES,
+        },
+        { status: 200 }
+      ),
+      rateCheck.result
     );
   }
 }
 
 export async function POST(request: Request) {
+  const blocked = guardSameOriginMutation(request);
+  if (blocked) return blocked;
+
+  const rateCheck = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.adminWrite
+  );
+  if (rateCheck.blocked) return rateCheck.blocked;
+
+  const auth = await requireAuthenticatedSession(request, ["superadmin"]);
+  if (auth.denied) return attachRateLimitHeaders(auth.denied, rateCheck.result);
+
   try {
     const body = await request.json();
     const {
@@ -66,20 +112,23 @@ export async function POST(request: Request) {
       operatingExpensesNgn = 0,
       trueNetProfitNgn = 0,
       status = "ACTIVE",
-      actor = "Superadmin HQ",
+      actor = auth.session.name,
     } = body;
 
     if (!name || !location) {
-      return NextResponse.json(
-        { ok: false, error: "Branch name and location are required." },
-        { status: 400 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          { ok: false, error: "Branch name and location are required." },
+          { status: 400 }
+        ),
+        rateCheck.result
       );
     }
 
     const branchId = id || `br-${Date.now()}`;
 
-    if (getNeonConnectionString()) {
-      await executeNeonSql(
+    if (getDatabaseConnectionString()) {
+      await executeSqlQuery(
         `INSERT INTO factory_branches (
           id, name, location, specialization, machine_count, staff_count,
           fabric_meters_stock, net_revenue_ngn, operating_expenses_ngn, true_net_profit_ngn, status
@@ -106,7 +155,7 @@ export async function POST(request: Request) {
         ]
       );
 
-      await executeNeonSql(
+      await executeSqlQuery(
         `INSERT INTO factory_audit_logs (id, action, actor, role, target_ref, summary)
          VALUES ($1,$2,$3,$4,$5,$6)`,
         [
@@ -120,16 +169,34 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ ok: true, id: branchId });
+    return attachRateLimitHeaders(
+      NextResponse.json({ ok: true, id: branchId }),
+      rateCheck.result
+    );
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || "Failed to create branch." },
-      { status: 500 }
+    return attachRateLimitHeaders(
+      NextResponse.json(
+        { ok: false, error: err?.message || "Failed to create branch." },
+        { status: 500 }
+      ),
+      rateCheck.result
     );
   }
 }
 
 export async function PUT(request: Request) {
+  const blocked = guardSameOriginMutation(request);
+  if (blocked) return blocked;
+
+  const rateCheck = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.adminWrite
+  );
+  if (rateCheck.blocked) return rateCheck.blocked;
+
+  const auth = await requireAuthenticatedSession(request, ["superadmin"]);
+  if (auth.denied) return attachRateLimitHeaders(auth.denied, rateCheck.result);
+
   try {
     const body = await request.json();
     const {
@@ -144,18 +211,21 @@ export async function PUT(request: Request) {
       operatingExpensesNgn,
       trueNetProfitNgn,
       status,
-      actor = "Superadmin HQ",
+      actor = auth.session.name,
     } = body;
 
     if (!id) {
-      return NextResponse.json(
-        { ok: false, error: "Branch id is required." },
-        { status: 400 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          { ok: false, error: "Branch id is required." },
+          { status: 400 }
+        ),
+        rateCheck.result
       );
     }
 
-    if (getNeonConnectionString()) {
-      await executeNeonSql(
+    if (getDatabaseConnectionString()) {
+      await executeSqlQuery(
         `UPDATE factory_branches
          SET
            name = COALESCE($2, name),
@@ -178,13 +248,15 @@ export async function PUT(request: Request) {
           staffCount !== undefined ? Number(staffCount) : null,
           fabricMetersStock !== undefined ? Number(fabricMetersStock) : null,
           netRevenueNgn !== undefined ? Number(netRevenueNgn) : null,
-          operatingExpensesNgn !== undefined ? Number(operatingExpensesNgn) : null,
+          operatingExpensesNgn !== undefined
+            ? Number(operatingExpensesNgn)
+            : null,
           trueNetProfitNgn !== undefined ? Number(trueNetProfitNgn) : null,
           status ?? null,
         ]
       );
 
-      await executeNeonSql(
+      await executeSqlQuery(
         `INSERT INTO factory_audit_logs (id, action, actor, role, target_ref, summary)
          VALUES ($1,$2,$3,$4,$5,$6)`,
         [
@@ -198,31 +270,52 @@ export async function PUT(request: Request) {
       );
     }
 
-    return NextResponse.json({ ok: true, id });
+    return attachRateLimitHeaders(
+      NextResponse.json({ ok: true, id }),
+      rateCheck.result
+    );
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || "Failed to update branch." },
-      { status: 500 }
+    return attachRateLimitHeaders(
+      NextResponse.json(
+        { ok: false, error: err?.message || "Failed to update branch." },
+        { status: 500 }
+      ),
+      rateCheck.result
     );
   }
 }
 
 export async function DELETE(request: Request) {
+  const blocked = guardSameOriginMutation(request);
+  if (blocked) return blocked;
+
+  const rateCheck = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.adminWrite
+  );
+  if (rateCheck.blocked) return rateCheck.blocked;
+
+  const auth = await requireAuthenticatedSession(request, ["superadmin"]);
+  if (auth.denied) return attachRateLimitHeaders(auth.denied, rateCheck.result);
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id") || "";
-    const actor = searchParams.get("actor") || "Superadmin HQ";
+    const actor = searchParams.get("actor") || auth.session.name;
 
     if (!id) {
-      return NextResponse.json(
-        { ok: false, error: "Branch id is required." },
-        { status: 400 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          { ok: false, error: "Branch id is required." },
+          { status: 400 }
+        ),
+        rateCheck.result
       );
     }
 
-    if (getNeonConnectionString()) {
-      await executeNeonSql(`DELETE FROM factory_branches WHERE id = $1`, [id]);
-      await executeNeonSql(
+    if (getDatabaseConnectionString()) {
+      await executeSqlQuery(`DELETE FROM factory_branches WHERE id = $1`, [id]);
+      await executeSqlQuery(
         `INSERT INTO factory_audit_logs (id, action, actor, role, target_ref, summary)
          VALUES ($1,$2,$3,$4,$5,$6)`,
         [
@@ -236,11 +329,17 @@ export async function DELETE(request: Request) {
       );
     }
 
-    return NextResponse.json({ ok: true, deletedId: id });
+    return attachRateLimitHeaders(
+      NextResponse.json({ ok: true, deletedId: id }),
+      rateCheck.result
+    );
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || "Failed to delete branch." },
-      { status: 500 }
+    return attachRateLimitHeaders(
+      NextResponse.json(
+        { ok: false, error: err?.message || "Failed to delete branch." },
+        { status: 500 }
+      ),
+      rateCheck.result
     );
   }
 }

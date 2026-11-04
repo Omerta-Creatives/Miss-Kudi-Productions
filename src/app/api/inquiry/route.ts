@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   calculateProductionEstimate,
   computeDefaultSizeBreakdown,
@@ -7,18 +7,29 @@ import {
   ProductionOrder,
 } from "../../lib/production-os";
 import {
-  executeNeonSql,
-  getNeonConnectionString,
-  insertOrderIntoNeon,
-} from "../../lib/neon-clerk";
+  executeSqlQuery,
+  getDatabaseConnectionString,
+  insertProductionOrder,
+} from "../../lib/database";
+import {
+  attachRateLimitHeaders,
+  enforceRequestRateLimit,
+  RATE_LIMIT_PROFILES,
+} from "../../lib/rate-limit";
 
 // Server-side fallback store for API requests during runtime
 const serverOrders: ProductionOrder[] = [...INITIAL_ORDERS];
 
-export async function GET() {
-  if (getNeonConnectionString()) {
+export async function GET(request: NextRequest) {
+  const { blocked, result } = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.inquiryRead
+  );
+  if (blocked) return blocked;
+
+  if (getDatabaseConnectionString()) {
     try {
-      const { rows } = await executeNeonSql<Record<string, any>>(
+      const { rows } = await executeSqlQuery<Record<string, any>>(
         `SELECT * FROM production_orders ORDER BY created_at DESC LIMIT 100`
       );
       if (rows.length > 0) {
@@ -56,25 +67,39 @@ export async function GET() {
           createdAt: r.created_at,
           updatedAt: r.updated_at,
         }));
-        return NextResponse.json({
-          ok: true,
-          source: "neon_postgres_serverless",
-          orders: mapped,
-        });
+        return attachRateLimitHeaders(
+          NextResponse.json({
+            ok: true,
+            source: "postgresql",
+            orders: mapped,
+          }),
+          result
+        );
       }
     } catch {
       // Fall back to in-memory seed orders if table not initialized yet
     }
   }
 
-  return NextResponse.json({
-    ok: true,
-    source: "hybrid_edge_store",
-    orders: serverOrders,
-  });
+  return attachRateLimitHeaders(
+    NextResponse.json({
+      ok: true,
+      source: "local_hybrid",
+      orders: serverOrders,
+    }),
+    result
+  );
 }
 
 export async function POST(request: Request) {
+  const { blocked, result } = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.inquirySubmit,
+    undefined,
+    "Too many production quote submissions. Please wait a few minutes before submitting another brief."
+  );
+  if (blocked) return blocked;
+
   const contentType = request.headers.get("content-type") || "";
   let payload: Record<string, any> = {};
 
@@ -91,9 +116,15 @@ export async function POST(request: Request) {
   const missing = required.filter((key) => !String(payload[key] ?? "").trim());
 
   if (missing.length) {
-    return NextResponse.json(
-      { ok: false, message: `Please complete required fields: ${missing.join(", ")}.` },
-      { status: 400 }
+    return attachRateLimitHeaders(
+      NextResponse.json(
+        {
+          ok: false,
+          message: `Please complete required fields: ${missing.join(", ")}.`,
+        },
+        { status: 400 }
+      ),
+      result
     );
   }
 
@@ -101,15 +132,17 @@ export async function POST(request: Request) {
     String(payload.offlineId || "").trim() ||
     `mkp-offline-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-  // Idempotent deduplication by offlineId
   const existing = serverOrders.find((o) => o.offlineId === offlineId);
   if (existing) {
-    return NextResponse.json({
-      ok: true,
-      deduplicated: true,
-      message: `Production inquiry ${existing.jobCode} already registered.`,
-      order: existing,
-    });
+    return attachRateLimitHeaders(
+      NextResponse.json({
+        ok: true,
+        deduplicated: true,
+        message: `Production inquiry ${existing.jobCode} already registered.`,
+        order: existing,
+      }),
+      result
+    );
   }
 
   const exactQuantity =
@@ -177,20 +210,23 @@ export async function POST(request: Request) {
 
   serverOrders.unshift(newOrder);
 
-  let persistedToNeon = false;
+  let persisted = false;
   try {
-    persistedToNeon = await insertOrderIntoNeon(newOrder);
+    persisted = await insertProductionOrder(newOrder);
   } catch {
-    persistedToNeon = false;
+    persisted = false;
   }
 
-  return NextResponse.json(
-    {
-      ok: true,
-      persistedToNeon,
-      message: `Production Brief ${newOrder.jobCode} logged and assigned to ${newOrder.assignedPatternDesigner} (Pattern Studio).`,
-      order: newOrder,
-    },
-    { status: 201 }
+  return attachRateLimitHeaders(
+    NextResponse.json(
+      {
+        ok: true,
+        persisted,
+        message: `Production Brief ${newOrder.jobCode} logged and assigned to ${newOrder.assignedPatternDesigner} (Pattern Studio).`,
+        order: newOrder,
+      },
+      { status: 201 }
+    ),
+    result
   );
 }

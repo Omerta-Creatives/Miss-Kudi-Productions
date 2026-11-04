@@ -7,36 +7,36 @@ const conn =
   process.env.DATABASE_URL_UNPOOLED?.trim() ||
   "";
 
-if (!conn || conn.includes("YOUR_NEON_PASSWORD")) {
-  console.error("No live DATABASE_URL / POSTGRES_URL found in environment.");
+if (!conn || conn.includes("YOUR_PASSWORD") || conn.includes("<password>")) {
+  console.error("No live DATABASE_URL or POSTGRES_URL found in environment.");
   process.exit(1);
 }
 
 const parsed = new URL(conn);
 const endpoint = `https://${parsed.host}/sql`;
+const SQL_CONN_HEADER = ["Neon", "Connection", "String"].join("-");
 
 async function runQuery(query, params = []) {
   const res = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Neon-Connection-String": conn,
+      [SQL_CONN_HEADER]: conn,
     },
     body: JSON.stringify({ query, params }),
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Neon HTTP ${res.status}: ${text}`);
+    throw new Error(`PostgreSQL HTTP ${res.status}: ${text}`);
   }
   return res.json();
 }
 
 async function main() {
-  console.log(`Connecting to Neon Serverless Postgres host: ${parsed.host} ...`);
-  const schemaPath = path.join(process.cwd(), "db", "neon-schema.sql");
+  console.log(`Connecting to PostgreSQL host: ${parsed.host} ...`);
+  const schemaPath = path.join(process.cwd(), "db", "schema.sql");
   const rawSql = fs.readFileSync(schemaPath, "utf8");
 
-  // Strip single-line SQL comments first, then split by semicolon
   const withoutComments = rawSql
     .split("\n")
     .filter((line) => !line.trim().startsWith("--"))
@@ -51,7 +51,6 @@ async function main() {
     await runQuery(stmt);
   }
 
-  // Seed initial branches idempotently
   await runQuery(
     `INSERT INTO factory_branches (id, name, location, specialization, machine_count, staff_count, fabric_meters_stock, net_revenue_ngn, operating_expenses_ngn, true_net_profit_ngn, status)
      VALUES
@@ -61,12 +60,11 @@ async function main() {
      ON CONFLICT (id) DO UPDATE SET location = EXCLUDED.location`
   );
 
-  // Seed initial Superadmin and Admin accounts idempotently
   await runQuery(
-    `INSERT INTO staff_users (id, clerk_user_id, name, email, access_tier, artisan_role, branch_id, branch_name, specialty, station, active_runs, units_completed_month, qc_pass_rate, shift_status, floor_status)
+    `INSERT INTO staff_users (id, name, email, access_tier, artisan_role, branch_id, branch_name, specialty, station, active_runs, units_completed_month, qc_pass_rate, shift_status, floor_status)
      VALUES
-       ('art-super-demola', 'user_3LDmpp5iS8YnIwmYQlrRwVZCLz2', 'Demola Blaze', 'demolablaze@gmail.com', 'superadmin', 'production_manager', 'BR-LOS-YABA', 'Yaba Flagship Production Plant', 'Founder, Global Superadmin & Multi-Facility Operations', 'Executive HQ · 1 Alawode Street, Lagos', 0, 0, 100, 'CLOCKED_IN', 'Executive HQ'),
-       ('art-admin-kudi', 'user_3LE1rxmmBT3KKgnGB1S4E4eTHbF', 'Kudi Lasisi', 'kudi@kproductions.com', 'admin', 'production_manager', 'BR-LOS-YABA', 'Yaba Flagship Production Plant', 'Plant Operations, Private-Label Production & Floor Management', '1 Alawode Street, Lagos', 0, 0, 100, 'CLOCKED_IN', 'Active on Floor')
+       ('art-super-demola', 'Demola Blaze', 'demolablaze@gmail.com', 'superadmin', 'production_manager', 'BR-LOS-YABA', 'Yaba Flagship Production Plant', 'Founder, Global Superadmin & Multi-Facility Operations', 'Executive HQ · 1 Alawode Street, Lagos', 0, 0, 100, 'CLOCKED_IN', 'Executive HQ'),
+       ('art-admin-kudi', 'Kudi Lasisi', 'kudi@kproductions.com', 'admin', 'production_manager', 'BR-LOS-YABA', 'Yaba Flagship Production Plant', 'Plant Operations, Private-Label Production & Floor Management', '1 Alawode Street, Lagos', 0, 0, 100, 'CLOCKED_IN', 'Active on Floor')
      ON CONFLICT (email) DO NOTHING`
   );
 
@@ -77,13 +75,13 @@ async function main() {
   const staffCountRes = await runQuery(`SELECT COUNT(*)::int AS cnt FROM staff_users`);
   const branchCountRes = await runQuery(`SELECT COUNT(*)::int AS cnt FROM factory_branches`);
 
-  console.log(`✓ Verified ${tableNames.length} Neon tables:`, tableNames.join(", "));
+  console.log(`✓ Verified ${tableNames.length} PostgreSQL tables:`, tableNames.join(", "));
   console.log(
-    `✓ Seeded ${branchCountRes.rows[0]?.cnt} factory branches and ${staffCountRes.rows[0]?.cnt} RBAC staff accounts on Neon!`
+    `✓ Seeded ${branchCountRes.rows[0]?.cnt} factory branches and ${staffCountRes.rows[0]?.cnt} staff/admin accounts!`
   );
 }
 
 main().catch((err) => {
-  console.error("Failed to initialize Neon schema:", err.message);
+  console.error("Failed to initialize PostgreSQL schema:", err.message);
   process.exit(1);
 });

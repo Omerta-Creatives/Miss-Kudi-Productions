@@ -2,25 +2,42 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   attachSessionCookie,
   createSessionToken,
-  ensureAuthSchemaInNeon,
+  ensureAuthSchema,
   guardSameOriginMutation,
   LOCKOUT_DURATION_MINUTES,
   MAX_FAILED_LOGIN_ATTEMPTS,
   verifyPasswordHash,
   verifySeededDefaultPassword,
 } from "../../../lib/auth-server";
-import { executeNeonSql, getNeonConnectionString } from "../../../lib/neon-clerk";
+import {
+  executeSqlQuery,
+  getDatabaseConnectionString,
+} from "../../../lib/database";
 import {
   ArtisanRole,
   ArtisanStaff,
   INITIAL_ARTISANS,
   INITIAL_BRANCHES,
+  sanitizeSpecialtyText,
   UserAccessTier,
 } from "../../../lib/production-os";
+import {
+  attachRateLimitHeaders,
+  enforceRequestRateLimit,
+  RATE_LIMIT_PROFILES,
+} from "../../../lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   const blocked = guardSameOriginMutation(request);
   if (blocked) return blocked;
+
+  const ipCheck = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.authLoginIp,
+    undefined,
+    "Too many sign-in attempts from this network. Please wait a moment and try again."
+  );
+  if (ipCheck.blocked) return ipCheck.blocked;
 
   try {
     const body = await request.json();
@@ -33,15 +50,30 @@ export async function POST(request: NextRequest) {
     const fallbackPasswordHash = body.fallbackPasswordHash as string | undefined;
 
     if (!cleanEmail || !cleanEmail.includes("@")) {
-      return NextResponse.json(
-        { ok: false, error: "Please enter a valid work email address." },
-        { status: 400 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          { ok: false, error: "Please enter a valid work email address." },
+          { status: 400 }
+        ),
+        ipCheck.result
       );
     }
+
+    const accountCheck = enforceRequestRateLimit(
+      request,
+      RATE_LIMIT_PROFILES.authLoginAccount,
+      cleanEmail,
+      "Too many sign-in attempts for this account. Please wait 60 seconds before trying again."
+    );
+    if (accountCheck.blocked) return accountCheck.blocked;
+
     if (!password) {
-      return NextResponse.json(
-        { ok: false, error: "Please enter your password." },
-        { status: 400 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          { ok: false, error: "Please enter your password." },
+          { status: 400 }
+        ),
+        accountCheck.result
       );
     }
 
@@ -49,12 +81,12 @@ export async function POST(request: NextRequest) {
     let dbPasswordHash: string | null = null;
     let failedAttempts = 0;
     let lockedUntil: string | null = null;
-    let neonReachable = false;
+    let dbReachable = false;
 
-    if (getNeonConnectionString()) {
+    if (getDatabaseConnectionString()) {
       try {
-        await ensureAuthSchemaInNeon();
-        const { rows } = await executeNeonSql<Record<string, any>>(
+        await ensureAuthSchema();
+        const { rows } = await executeSqlQuery<Record<string, any>>(
           `SELECT
             id, name, email, password_hash, failed_login_attempts, locked_until,
             access_tier, artisan_role, branch_id, branch_name, specialty, station,
@@ -64,7 +96,7 @@ export async function POST(request: NextRequest) {
            LIMIT 1`,
           [cleanEmail]
         );
-        neonReachable = true;
+        dbReachable = true;
 
         if (rows.length > 0) {
           const r = rows[0];
@@ -79,7 +111,7 @@ export async function POST(request: NextRequest) {
             role: (r.artisan_role as ArtisanRole) || "tailor",
             branchId: String(r.branch_id || INITIAL_BRANCHES[0].id),
             branchName: String(r.branch_name || INITIAL_BRANCHES[0].name),
-            specialty: String(r.specialty || ""),
+            specialty: sanitizeSpecialtyText(String(r.specialty || "")),
             station: String(r.station || "Main Factory Floor"),
             activeRuns: Number(r.active_runs ?? 0),
             unitsCompletedMonth: Number(r.units_completed_month ?? 0),
@@ -91,11 +123,10 @@ export async function POST(request: NextRequest) {
           };
         }
       } catch {
-        neonReachable = false;
+        dbReachable = false;
       }
     }
 
-    // Fallback to seeded accounts or client-provisioned roster if not yet synced to Neon
     if (!matchedUser) {
       const seedMatch = INITIAL_ARTISANS.find(
         (a) => a.email.toLowerCase() === cleanEmail
@@ -106,41 +137,45 @@ export async function POST(request: NextRequest) {
         fallbackAccount &&
         fallbackAccount.email?.toLowerCase() === cleanEmail
       ) {
-        matchedUser = fallbackAccount;
+        matchedUser = {
+          ...fallbackAccount,
+          specialty: sanitizeSpecialtyText(fallbackAccount.specialty),
+        };
       }
     }
 
     if (!matchedUser) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "No provisioned factory account matches that email. Contact Superadmin HQ or your Plant Admin to be onboarded.",
-        },
-        { status: 401 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          {
+            ok: false,
+            error:
+              "No provisioned factory account matches that email. Contact your Plant Admin or Superadmin HQ to be onboarded.",
+          },
+          { status: 401 }
+        ),
+        accountCheck.result
       );
     }
 
-    // Enforce temporary account lockout after repeated failed attempts
     if (lockedUntil && new Date(lockedUntil).getTime() > Date.now()) {
       const minutesLeft = Math.max(
         1,
         Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 60000)
       );
-      return NextResponse.json(
-        {
-          ok: false,
-          locked: true,
-          error: `Account temporarily locked after ${MAX_FAILED_LOGIN_ATTEMPTS} failed sign-in attempts. Try again in ${minutesLeft} min or use Forgot Password to unlock immediately.`,
-        },
-        { status: 429 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          {
+            ok: false,
+            locked: true,
+            error: `Account temporarily locked after ${MAX_FAILED_LOGIN_ATTEMPTS} failed sign-in attempts. Try again in ${minutesLeft} min or use Forgot Password to unlock immediately.`,
+          },
+          { status: 429 }
+        ),
+        accountCheck.result
       );
     }
 
-    // Verify password:
-    // 1. Custom PBKDF2 hash stored in Neon DB
-    // 2. Hybrid local PBKDF2 hash (for offline-provisioned or offline-reset accounts)
-    // 3. Seeded default credentials (when no custom password hash exists yet)
     let passwordValid = false;
     const effectiveHash = dbPasswordHash || fallbackPasswordHash || null;
 
@@ -151,7 +186,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!passwordValid) {
-      if (neonReachable) {
+      if (dbReachable) {
         const nextFailed = failedAttempts + 1;
         const shouldLock = nextFailed >= MAX_FAILED_LOGIN_ATTEMPTS;
         const lockTimestamp = shouldLock
@@ -159,7 +194,7 @@ export async function POST(request: NextRequest) {
               Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000
             ).toISOString()
           : null;
-        await executeNeonSql(
+        await executeSqlQuery(
           `UPDATE staff_users
            SET failed_login_attempts = $2,
                locked_until = $3
@@ -168,43 +203,48 @@ export async function POST(request: NextRequest) {
         ).catch(() => {});
 
         const remaining = Math.max(0, MAX_FAILED_LOGIN_ATTEMPTS - nextFailed);
-        return NextResponse.json(
-          {
-            ok: false,
-            error: shouldLock
-              ? `Too many failed attempts. Account locked for ${LOCKOUT_DURATION_MINUTES} minutes — use Reset Password to unlock.`
-              : `Incorrect password for ${cleanEmail}. ${remaining} attempt${
-                  remaining === 1 ? "" : "s"
-                } remaining before temporary lockout.`,
-          },
-          { status: 401 }
+        return attachRateLimitHeaders(
+          NextResponse.json(
+            {
+              ok: false,
+              error: shouldLock
+                ? `Too many failed attempts. Account locked for ${LOCKOUT_DURATION_MINUTES} minutes — use Reset Password to unlock.`
+                : `Incorrect password for ${cleanEmail}. ${remaining} attempt${
+                    remaining === 1 ? "" : "s"
+                  } remaining before temporary lockout.`,
+            },
+            { status: 401 }
+          ),
+          accountCheck.result
         );
       }
 
-      return NextResponse.json(
-        {
-          ok: false,
-          error: effectiveHash
-            ? `Incorrect password for ${cleanEmail}. Use Forgot Password if you need to reset it.`
-            : verifySeededDefaultPassword(cleanEmail, "__probe__") ||
-              cleanEmail === "kudi@kproductions.com" ||
-              cleanEmail === "demolablaze@gmail.com"
-            ? `Incorrect password for ${cleanEmail}.`
-            : `No password has been set for ${cleanEmail} yet. Click "Forgot password?" to set your password in 60 seconds.`,
-        },
-        { status: 401 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          {
+            ok: false,
+            error: effectiveHash
+              ? `Incorrect password for ${cleanEmail}. Use Forgot Password if you need to reset it.`
+              : verifySeededDefaultPassword(cleanEmail, "__probe__") ||
+                cleanEmail === "kudi@kproductions.com" ||
+                cleanEmail === "demolablaze@gmail.com"
+              ? `Incorrect password for ${cleanEmail}.`
+              : `No password has been set for ${cleanEmail} yet. Click "Forgot password?" to set your password in 60 seconds.`,
+          },
+          { status: 401 }
+        ),
+        accountCheck.result
       );
     }
 
-    // Password verified — mint signed session token & cookie
     const { token, payload } = await createSessionToken(
       matchedUser,
       rememberMe
     );
     const expiresAtIso = new Date(payload.exp * 1000).toISOString();
 
-    if (neonReachable) {
-      await executeNeonSql(
+    if (dbReachable) {
+      await executeSqlQuery(
         `UPDATE staff_users
          SET failed_login_attempts = 0,
              locked_until = NULL,
@@ -213,7 +253,7 @@ export async function POST(request: NextRequest) {
         [cleanEmail]
       ).catch(() => {});
 
-      await executeNeonSql(
+      await executeSqlQuery(
         `INSERT INTO auth_sessions (
           id, user_id, email, access_tier, remember_me, user_agent, expires_at
         ) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
@@ -228,7 +268,7 @@ export async function POST(request: NextRequest) {
         ]
       ).catch(() => {});
 
-      await executeNeonSql(
+      await executeSqlQuery(
         `INSERT INTO factory_audit_logs (id, action, actor, role, target_ref, summary)
          VALUES ($1,$2,$3,$4,$5,$6)`,
         [
@@ -238,7 +278,7 @@ export async function POST(request: NextRequest) {
           matchedUser.accessTier.toUpperCase(),
           matchedUser.email,
           `Signed in to Operations OS (${
-            rememberMe ? "30-day Remember Me workstation" : "8-hour floor shift"
+            rememberMe ? "30-day workstation session" : "8-hour floor shift"
           }).`,
         ]
       ).catch(() => {});
@@ -254,13 +294,18 @@ export async function POST(request: NextRequest) {
         issuedAt: new Date(payload.iat * 1000).toISOString(),
       },
     });
-
     attachSessionCookie(response, request, token, rememberMe);
-    return response;
+    return attachRateLimitHeaders(response, accountCheck.result);
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || "Authentication failed." },
-      { status: 500 }
+    return attachRateLimitHeaders(
+      NextResponse.json(
+        {
+          ok: false,
+          error: err?.message || "Authentication error. Please try again.",
+        },
+        { status: 500 }
+      ),
+      ipCheck.result
     );
   }
 }

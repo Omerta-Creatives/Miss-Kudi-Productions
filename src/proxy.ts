@@ -3,6 +3,11 @@ import {
   extractSessionTokenFromRequest,
   verifySessionToken,
 } from "./app/lib/auth-server";
+import {
+  attachRateLimitHeaders,
+  enforceRequestRateLimit,
+  RATE_LIMIT_PROFILES,
+} from "./app/lib/rate-limit";
 
 const PROTECTED_PREFIXES = [
   "/superadmin",
@@ -25,6 +30,21 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+
+  // Global per-IP API rate limit guard before individual route limiters
+  if (pathname.startsWith("/api/")) {
+    const { blocked, result } = enforceRequestRateLimit(
+      request,
+      RATE_LIMIT_PROFILES.apiGlobal
+    );
+    if (blocked) {
+      return applySecurityHeaders(blocked);
+    }
+    const response = NextResponse.next();
+    attachRateLimitHeaders(response, result);
+    return applySecurityHeaders(response);
+  }
+
   const isProtected = PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
@@ -66,6 +86,7 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/api/:path*",
     "/superadmin/:path*",
     "/dashboard/:path*",
     "/workspace/:path*",

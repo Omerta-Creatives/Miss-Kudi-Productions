@@ -603,7 +603,7 @@ export default function FactoryWorkspacePage() {
         <div className="section-heading" style={{ marginBottom: 24 }}>
           <div>
             <div className="section-kicker">
-              MISS KUDI PRODUCTIONS · FACTORY OPERATIONS OS (NEXUS HYBRID ENGINE)
+              FACTORY OPERATIONS WORKSPACE
             </div>
             <h2>
               Artisan Floor, Fabric Runway &amp;{" "}

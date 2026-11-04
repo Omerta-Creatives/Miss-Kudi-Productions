@@ -2,28 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   attachSessionCookie,
   createSessionToken,
-  ensureAuthSchemaInNeon,
+  ensureAuthSchema,
   guardSameOriginMutation,
   hashPassword,
   validatePasswordStrength,
   verifyResetOtpChallenge,
 } from "../../../lib/auth-server";
 import {
-  executeNeonSql,
-  getNeonConnectionString,
-  isClerkSecretConfigured,
-} from "../../../lib/neon-clerk";
+  executeSqlQuery,
+  getDatabaseConnectionString,
+} from "../../../lib/database";
 import {
   ArtisanRole,
   ArtisanStaff,
   INITIAL_ARTISANS,
   INITIAL_BRANCHES,
+  sanitizeSpecialtyText,
   UserAccessTier,
 } from "../../../lib/production-os";
+import {
+  attachRateLimitHeaders,
+  enforceRequestRateLimit,
+  RATE_LIMIT_PROFILES,
+} from "../../../lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   const blocked = guardSameOriginMutation(request);
   if (blocked) return blocked;
+
+  const ipCheck = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.authRecoveryIp,
+    undefined,
+    "Too many password reset verification attempts. Please wait before trying again."
+  );
+  if (ipCheck.blocked) return ipCheck.blocked;
 
   try {
     const body = await request.json();
@@ -40,17 +53,31 @@ export async function POST(request: NextRequest) {
     const fallbackAccount = body.fallbackAccount as ArtisanStaff | undefined;
 
     if (!cleanEmail || !cleanEmail.includes("@")) {
-      return NextResponse.json(
-        { ok: false, error: "Valid work email is required." },
-        { status: 400 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          { ok: false, error: "Valid work email is required." },
+          { status: 400 }
+        ),
+        ipCheck.result
       );
     }
 
+    const accountCheck = enforceRequestRateLimit(
+      request,
+      RATE_LIMIT_PROFILES.authRecoveryAccount,
+      cleanEmail,
+      "Too many code verification attempts for this email. Please wait 15 minutes before trying again."
+    );
+    if (accountCheck.blocked) return accountCheck.blocked;
+
     const strengthError = validatePasswordStrength(newPassword);
     if (strengthError) {
-      return NextResponse.json(
-        { ok: false, error: strengthError },
-        { status: 400 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          { ok: false, error: strengthError },
+          { status: 400 }
+        ),
+        accountCheck.result
       );
     }
 
@@ -60,13 +87,16 @@ export async function POST(request: NextRequest) {
       resetChallenge
     );
     if (!otpCheck.valid) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            otpCheck.reason || "Invalid or expired 6-digit verification code.",
-        },
-        { status: 400 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          {
+            ok: false,
+            error:
+              otpCheck.reason || "Invalid or expired 6-digit verification code.",
+          },
+          { status: 400 }
+        ),
+        accountCheck.result
       );
     }
 
@@ -74,13 +104,16 @@ export async function POST(request: NextRequest) {
     let matchedUser: ArtisanStaff | null =
       INITIAL_ARTISANS.find((a) => a.email.toLowerCase() === cleanEmail) ||
       (fallbackAccount?.email?.toLowerCase() === cleanEmail
-        ? fallbackAccount
+        ? {
+            ...fallbackAccount,
+            specialty: sanitizeSpecialtyText(fallbackAccount.specialty),
+          }
         : null);
 
-    if (getNeonConnectionString()) {
+    if (getDatabaseConnectionString()) {
       try {
-        await ensureAuthSchemaInNeon();
-        const { rows } = await executeNeonSql<Record<string, any>>(
+        await ensureAuthSchema();
+        const { rows } = await executeSqlQuery<Record<string, any>>(
           `SELECT
             id, name, email, access_tier, artisan_role, branch_id, branch_name,
             specialty, station, active_runs, units_completed_month, qc_pass_rate,
@@ -101,7 +134,7 @@ export async function POST(request: NextRequest) {
             role: (r.artisan_role as ArtisanRole) || "tailor",
             branchId: String(r.branch_id || INITIAL_BRANCHES[0].id),
             branchName: String(r.branch_name || INITIAL_BRANCHES[0].name),
-            specialty: String(r.specialty || ""),
+            specialty: sanitizeSpecialtyText(String(r.specialty || "")),
             station: String(r.station || "Main Factory Floor"),
             activeRuns: Number(r.active_runs ?? 0),
             unitsCompletedMonth: Number(r.units_completed_month ?? 0),
@@ -112,7 +145,7 @@ export async function POST(request: NextRequest) {
               (r.floor_status as ArtisanStaff["status"]) || "Active on Floor",
           };
 
-          await executeNeonSql(
+          await executeSqlQuery(
             `UPDATE staff_users
              SET password_hash = $2,
                  must_reset_password = FALSE,
@@ -123,8 +156,7 @@ export async function POST(request: NextRequest) {
             [cleanEmail, passwordHash]
           );
         } else if (matchedUser) {
-          // Seed account had not yet been inserted into staff_users — upsert with new hash
-          await executeNeonSql(
+          await executeSqlQuery(
             `INSERT INTO staff_users (
               id, name, email, password_hash, access_tier, artisan_role,
               branch_name, specialty, station, active_runs,
@@ -154,13 +186,12 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Revoke any prior sessions for this user after password reset
-        await executeNeonSql(
+        await executeSqlQuery(
           `UPDATE auth_sessions SET revoked_at = NOW() WHERE LOWER(email) = $1 AND revoked_at IS NULL`,
           [cleanEmail]
         ).catch(() => {});
 
-        await executeNeonSql(
+        await executeSqlQuery(
           `INSERT INTO factory_audit_logs (id, action, actor, role, target_ref, summary)
            VALUES ($1,$2,$3,$4,$5,$6)`,
           [
@@ -177,44 +208,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Optional live Clerk password sync if Clerk Secret is active
-    if (isClerkSecretConfigured()) {
-      try {
-        const clerkSecret = process.env.CLERK_SECRET_KEY!.trim();
-        const searchRes = await fetch(
-          `https://api.clerk.com/v1/users?email_address=${encodeURIComponent(
-            cleanEmail
-          )}`,
-          { headers: { Authorization: `Bearer ${clerkSecret}` } }
-        );
-        if (searchRes.ok) {
-          const users = await searchRes.json();
-          if (Array.isArray(users) && users.length > 0 && users[0].id) {
-            await fetch(`https://api.clerk.com/v1/users/${users[0].id}`, {
-              method: "PATCH",
-              headers: {
-                Authorization: `Bearer ${clerkSecret}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                password: newPassword,
-                skip_password_checks: true,
-              }),
-            });
-          }
-        }
-      } catch {
-        // Non-blocking if Clerk API is unreachable
-      }
-    }
-
     if (!matchedUser) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Account profile could not be resolved after verification.",
-        },
-        { status: 404 }
+      return attachRateLimitHeaders(
+        NextResponse.json(
+          {
+            ok: false,
+            error: "Account profile could not be resolved after verification.",
+          },
+          { status: 404 }
+        ),
+        accountCheck.result
       );
     }
 
@@ -237,19 +240,25 @@ export async function POST(request: NextRequest) {
         },
       });
       attachSessionCookie(response, request, token, rememberMe);
-      return response;
+      return attachRateLimitHeaders(response, accountCheck.result);
     }
 
-    return NextResponse.json({
-      ok: true,
-      signedIn: false,
-      passwordHash,
-      user: matchedUser,
-    });
+    return attachRateLimitHeaders(
+      NextResponse.json({
+        ok: true,
+        signedIn: false,
+        passwordHash,
+        user: matchedUser,
+      }),
+      accountCheck.result
+    );
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || "Password reset failed." },
-      { status: 500 }
+    return attachRateLimitHeaders(
+      NextResponse.json(
+        { ok: false, error: err?.message || "Password reset failed." },
+        { status: 500 }
+      ),
+      ipCheck.result
     );
   }
 }

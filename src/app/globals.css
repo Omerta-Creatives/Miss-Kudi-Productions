@@ -81,7 +81,7 @@ p, blockquote, li {
   outline-offset: 2px;
 }
 
-/* Global RBAC & Neon + Clerk Topbar */
+/* Internal Session Utility Classes */
 .rbac-topbar {
   background: #141a0e;
   color: #f4f1ea;
@@ -382,6 +382,55 @@ p, blockquote, li {
   gap: 10px;
 }
 
+.header-session-cluster {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 12px;
+  background: #f3efe6;
+  border: 1px solid var(--line);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.header-user-pill small {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding-left: 6px;
+  border-left: 1px solid var(--line);
+}
+
+.header-signout-btn {
+  min-height: 38px;
+  padding: 0 14px;
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  color: #ffffff;
+  font: 700 11px var(--sans);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background-color 0.16s ease, opacity 0.16s ease;
+}
+
+.header-signout-btn:hover {
+  background: #2b3818;
+}
+
+.header-signout-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* 48x48px Minimum Tap Target Mobile Menu Trigger (a11y-debugging) */
 .mobile-menu-trigger {
   display: none;
@@ -518,6 +567,14 @@ p, blockquote, li {
   font-weight: 600;
   color: var(--muted);
   border-radius: 4px;
+}
+
+.mobile-dock-btn {
+  background: transparent;
+  border: none;
+  font-family: var(--sans);
+  cursor: pointer;
+  padding: 0;
 }
 
 .mobile-dock-item.active {
@@ -1703,9 +1760,9 @@ select.user-invalid-fallback ~ .error-msg {
 /* Factory Operations Workspace & Dashboard Sidebar Shell (modern-web-guidance: css-layout) */
 .dashboard-shell {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 268px minmax(0, 1fr);
   grid-template-areas: "sidebar main";
-  min-block-size: calc(100dvh - 118px);
+  min-block-size: calc(100dvh - 68px);
   background: var(--paper);
   border-top: 1px solid var(--line);
 }
@@ -2042,6 +2099,229 @@ select.user-invalid-fallback ~ .error-msg {
   gap: 6px;
   font-size: 11px;
   color: var(--muted);
+}
+
+.sidebar-identity-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.sidebar-facility-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.sidebar-facility-picker > span {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.sidebar-signout-btn {
+  color: #8a2425;
+  border-color: rgba(158, 42, 43, 0.24);
+}
+
+.sidebar-signout-btn:hover {
+  background: #fdf2f2;
+  border-color: #9e2a2b;
+}
+
+/* Calm Single-Row Console Page Header */
+.dashboard-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dashboard-page-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.dashboard-page-title {
+  font-family: var(--serif);
+  font-size: clamp(1.4rem, 1.15rem + 0.7vw, 1.85rem);
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--ink);
+  margin: 0;
+}
+
+.dashboard-page-subtitle {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 3px 0 0;
+  line-height: 1.4;
+}
+
+.dashboard-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.panel-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+/* Scannable Overview Summary Cards & Rows */
+.overview-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.summary-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.summary-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 2px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.summary-list-row:last-child {
+  border-bottom: none;
+  padding-bottom: 2px;
+}
+
+.summary-list-primary {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.summary-row-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.summary-row-sub {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.summary-muted-code {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.summary-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.console-empty-state {
+  padding: 24px 16px;
+  text-align: center;
+  background: #faf8f4;
+  border: 1px dashed var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.console-empty-state p {
+  margin: 0;
+}
+
+.facility-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.facility-snapshot-card {
+  border: 1px solid var(--line);
+  background: #fcfaf6;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.facility-snapshot-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.facility-snapshot-head h4 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--ink);
+}
+
+.facility-snapshot-head p {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin: 2px 0 0;
+}
+
+.facility-snapshot-spec {
+  font-size: 12px;
+  color: #4a4741;
+  line-height: 1.45;
+}
+
+.facility-snapshot-metrics {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--ink);
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.facility-snapshot-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .dashboard-topbar-strip {
@@ -3314,6 +3594,8 @@ figure {
     grid-template-columns: repeat(2, 1fr);
   }
   .dashboard-split-grid,
+  .overview-summary-grid,
+  .facility-snapshot-grid,
   .login-grid,
   .marketing-hero-grid,
   .process-stage-card,

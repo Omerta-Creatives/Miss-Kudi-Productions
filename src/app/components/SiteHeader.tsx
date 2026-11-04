@@ -7,20 +7,13 @@ import {
   ACCESS_TIER_LABELS,
   ARTISAN_ROLE_LABELS,
   ArtisanStaff,
-  canManageFactory,
   clearCurrentSessionUser,
   ClientSessionMeta,
-  FactoryBranch,
-  getActiveBranchId,
   getCurrentSessionMeta,
   getCurrentSessionUser,
   INITIAL_ARTISANS,
-  INITIAL_BRANCHES,
   isSessionAuthenticated,
   isSuperAdminUser,
-  loadArtisans,
-  loadBranches,
-  setActiveBranchId,
   setCurrentSessionUser,
 } from "../lib/production-os";
 
@@ -32,17 +25,10 @@ export default function SiteHeader() {
 
   const [authenticated, setAuthenticated] = useState(false);
   const [sessionMeta, setSessionMeta] = useState<ClientSessionMeta | null>(null);
-  const [canImpersonate, setCanImpersonate] = useState(false);
   const [user, setUser] = useState<ArtisanStaff>(INITIAL_ARTISANS[0]);
-  const [artisans, setArtisans] = useState<ArtisanStaff[]>(INITIAL_ARTISANS);
-  const [branches, setBranches] = useState<FactoryBranch[]>(INITIAL_BRANCHES);
-  const [activeBranchId, setBranchState] = useState<string>(
-    INITIAL_BRANCHES[0].id
-  );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
-  // Strict boundary: Internal in-house portals vs. Public marketing/client pages
   const isInternalRoute =
     pathname.startsWith("/workspace") ||
     pathname.startsWith("/dashboard") ||
@@ -56,20 +42,10 @@ export default function SiteHeader() {
       const authed = isSessionAuthenticated();
       setAuthenticated(authed);
       setSessionMeta(getCurrentSessionMeta());
-      setArtisans(loadArtisans());
-      setBranches(loadBranches());
-      const current = getCurrentSessionUser();
-      setUser(current);
-      if (authed && current.accessTier === "superadmin") {
-        setCanImpersonate(true);
-      } else if (!authed) {
-        setCanImpersonate(false);
-      }
-      setBranchState(getActiveBranchId());
+      setUser(getCurrentSessionUser());
     };
     syncState();
 
-    // Sync authoritative server HttpOnly session cookie
     if (isInternalRoute) {
       fetch("/api/auth/session")
         .then((r) => r.json())
@@ -77,9 +53,6 @@ export default function SiteHeader() {
           if (data?.authenticated && data.user) {
             setAuthenticated(true);
             setUser(data.user);
-            if (data.user.accessTier === "superadmin") {
-              setCanImpersonate(true);
-            }
             const meta: ClientSessionMeta = {
               authenticated: true,
               rememberMe: Boolean(data.session?.rememberMe),
@@ -96,7 +69,6 @@ export default function SiteHeader() {
           } else {
             setAuthenticated(false);
             setSessionMeta(null);
-            setCanImpersonate(false);
           }
         })
         .catch(() => {});
@@ -154,63 +126,17 @@ export default function SiteHeader() {
     };
   }, []);
 
-  const handleRoleSwitch = async (userId: string) => {
-    const target = artisans.find((a) => a.id === userId);
-    if (!target) return;
-
-    // Security guard: Only Superadmin sessions can impersonate/switch stations without password
-    if (!authenticated || !canImpersonate || user.accessTier !== "superadmin") {
-      setDrawerOpen(false);
-      router.push(`/login?email=${encodeURIComponent(target.email)}`);
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/auth/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetUser: target }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        router.push(`/login?email=${encodeURIComponent(target.email)}`);
-        return;
-      }
-      setCurrentSessionUser(target, {
-        rememberMe: data.session?.rememberMe,
-        expiresAt: data.session?.expiresAt,
-        sessionId: data.session?.sessionId,
-      });
-      setUser(target);
-      setBranchState(target.branchId);
-      if (
-        pathname.startsWith("/superadmin") &&
-        target.accessTier !== "superadmin"
-      ) {
-        router.push("/dashboard");
-      }
-    } catch {
-      router.push(`/login?email=${encodeURIComponent(target.email)}`);
-    }
-  };
-
-  const handleBranchSwitch = (branchId: string) => {
-    setActiveBranchId(branchId);
-    setBranchState(branchId);
-  };
-
   const handleSignOut = async () => {
     if (signingOut) return;
     setSigningOut(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } catch {
-      // Clear local session regardless
+      // Clear local session state even if offline
     } finally {
       clearCurrentSessionUser();
       setAuthenticated(false);
       setSessionMeta(null);
-      setCanImpersonate(false);
       setSigningOut(false);
       setDrawerOpen(false);
       router.push("/login?signedOut=1");
@@ -219,7 +145,6 @@ export default function SiteHeader() {
   };
 
   const isSuper = authenticated && isSuperAdminUser(user);
-  const canManage = authenticated && canManageFactory(user);
 
   const publicNavLinks = [
     { href: "/", label: "Home" },
@@ -232,35 +157,20 @@ export default function SiteHeader() {
 
   const internalNavLinks = authenticated
     ? [
-        ...(isSuper ? [{ href: "/superadmin", label: "★ Superadmin HQ" }] : []),
+        ...(isSuper ? [{ href: "/superadmin", label: "Superadmin HQ" }] : []),
         {
           href: "/dashboard",
-          label:
-            user.accessTier === "staff"
-              ? `My Station (${ARTISAN_ROLE_LABELS[user.role].split(" ")[0]})`
-              : "Admin & Staff Console",
+          label: user.accessTier === "staff" ? "My Station" : "Plant Console",
         },
-        { href: "/workspace", label: "Operations Workspace" },
+        { href: "/workspace", label: "Workspace" },
         { href: "/tracker", label: "Order Tracker" },
       ]
     : [
-        { href: "/login", label: "Staff & Admin Sign-In" },
+        { href: "/login", label: "Sign In" },
         { href: "/reset-password", label: "Reset Password" },
       ];
 
   const navLinks = isInternalRoute ? internalNavLinks : publicNavLinks;
-
-  const internalPortalBadge = pathname.startsWith("/superadmin")
-    ? "SUPERADMIN GLOBAL HQ"
-    : pathname.startsWith("/workspace")
-    ? "FACTORY OPERATIONS OS"
-    : pathname.startsWith("/tracker")
-    ? "IN-HOUSE ORDER TRACKER"
-    : pathname.startsWith("/reset-password")
-    ? "IDENTITY RECOVERY DESK"
-    : pathname.startsWith("/login")
-    ? "STAFF & ADMIN AUTHENTICATION"
-    : "PLANT ADMIN & STAFF CONSOLE";
 
   return (
     <>
@@ -268,130 +178,7 @@ export default function SiteHeader() {
         Skip to main content
       </a>
 
-      {/* Internal RBAC Bar — Rendered STRICTLY on in-house staff/admin routes */}
-      {isInternalRoute && (
-        <div className="rbac-topbar no-print">
-          <div className="rbac-topbar-inner">
-            <div className="rbac-status-group">
-              <span className="rbac-pill rbac-pill-ok">
-                <span className="status-dot" />
-                IN-HOUSE PRODUCTION OS
-              </span>
-              {authenticated ? (
-                <>
-                  <span className="rbac-pill rbac-pill-tier">
-                    {user.name} · {user.accessTier.toUpperCase()} (
-                    {ARTISAN_ROLE_LABELS[user.role]})
-                  </span>
-                  <span className="rbac-pill">
-                    {sessionMeta?.rememberMe
-                      ? "30D WORKSTATION"
-                      : "8H FLOOR SHIFT"}
-                  </span>
-                </>
-              ) : (
-                <span className="rbac-pill rbac-pill-warn">
-                  AUTHENTICATION REQUIRED · SIGN IN TO UNLOCK STATIONS
-                </span>
-              )}
-            </div>
-
-            <div className="rbac-controls-group">
-              {authenticated && isSuper && (
-                <label
-                  className="rbac-select-label"
-                  htmlFor="global-role-switcher"
-                >
-                  <span>Station Preview:</span>
-                  <select
-                    id="global-role-switcher"
-                    className="rbac-select"
-                    value={user.id}
-                    onChange={(e) => handleRoleSwitch(e.target.value)}
-                  >
-                    <optgroup label="Superadmin (Global Executive HQ)">
-                      {artisans
-                        .filter((a) => a.accessTier === "superadmin")
-                        .map((a) => (
-                          <option key={a.id} value={a.id}>
-                            ★ {a.name} — Superadmin
-                          </option>
-                        ))}
-                    </optgroup>
-                    <optgroup label="Admin (Plant & Atelier Managers)">
-                      {artisans
-                        .filter((a) => a.accessTier === "admin")
-                        .map((a) => (
-                          <option key={a.id} value={a.id}>
-                            ◆ {a.name} — Admin ({a.branchName.split(" ")[0]})
-                          </option>
-                        ))}
-                    </optgroup>
-                    <optgroup label="Staff (Pattern, Cutting, Tailors & QC)">
-                      {artisans
-                        .filter((a) => a.accessTier === "staff")
-                        .map((a) => (
-                          <option key={a.id} value={a.id}>
-                            • {a.name} — {ARTISAN_ROLE_LABELS[a.role]}
-                          </option>
-                        ))}
-                    </optgroup>
-                  </select>
-                </label>
-              )}
-
-              {canManage && (
-                <label
-                  className="rbac-select-label"
-                  htmlFor="global-branch-switcher"
-                >
-                  <span>Plant Scope:</span>
-                  <select
-                    id="global-branch-switcher"
-                    className="rbac-select"
-                    value={activeBranchId}
-                    onChange={(e) => handleBranchSwitch(e.target.value)}
-                  >
-                    <option value="ALL">
-                      All Lagos Facilities (Consolidated)
-                    </option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-
-              {authenticated ? (
-                <>
-                  <Link
-                    href="/login?mode=change-password"
-                    className="rbac-signin-link"
-                  >
-                    Password ⚙
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={handleSignOut}
-                    disabled={signingOut}
-                    className="rbac-signout-btn"
-                  >
-                    {signingOut ? "Signing out..." : "Sign Out →"}
-                  </button>
-                </>
-              ) : (
-                <Link href="/login" className="rbac-signin-link">
-                  Sign In →
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main Navigation Header */}
+      {/* Unified Single-Row Navigation Header */}
       <header
         className={`site-header no-print ${
           isInternalRoute ? "site-header-internal" : ""
@@ -411,16 +198,6 @@ export default function SiteHeader() {
               className="wordmark-logo-img"
             />
           </Link>
-          {isInternalRoute && (
-            <div className="internal-header-context mono">
-              <span className="internal-context-kicker">
-                MISS KUDI PRODUCTIONS
-              </span>
-              <strong className="internal-context-title">
-                {internalPortalBadge}
-              </strong>
-            </div>
-          )}
         </div>
 
         <nav
@@ -447,17 +224,71 @@ export default function SiteHeader() {
         </nav>
 
         <div className="header-actions-group">
-          <Link
-            className={`button ${
-              isInternalRoute
-                ? "button-light internal-exit-btn"
-                : "button-dark"
-            } header-cta desktop-cta`}
-            href={isInternalRoute ? "/" : "/quote"}
-          >
-            {isInternalRoute ? "Public Website" : "Request a Quote"}{" "}
-            <span>↗</span>
-          </Link>
+          {isInternalRoute ? (
+            authenticated ? (
+              <>
+                <div className="header-session-cluster desktop-cta">
+                  <span className="header-user-pill">
+                    <span className="status-dot" aria-hidden="true" />
+                    <span>{user.name}</span>
+                    <small className="mono">{user.accessTier.toUpperCase()}</small>
+                  </span>
+                  <Link
+                    className="button button-light internal-exit-btn"
+                    href="/"
+                  >
+                    Public Site <span>↗</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    disabled={signingOut}
+                    className="header-signout-btn"
+                  >
+                    {signingOut ? "Signing out..." : "Sign Out"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="header-session-cluster desktop-cta">
+                <Link
+                  className="button button-light internal-exit-btn"
+                  href="/"
+                >
+                  Public Site <span>↗</span>
+                </Link>
+                {!pathname.startsWith("/login") && (
+                  <Link className="button button-dark header-cta" href="/login">
+                    Sign In
+                  </Link>
+                )}
+              </div>
+            )
+          ) : (
+            <div className="header-session-cluster desktop-cta">
+              {authenticated && (
+                <>
+                  <Link
+                    className="button button-light internal-exit-btn"
+                    href={isSuper ? "/superadmin" : "/dashboard"}
+                  >
+                    Console <span>→</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    disabled={signingOut}
+                    className="header-signout-btn"
+                  >
+                    {signingOut ? "Signing out..." : "Sign Out"}
+                  </button>
+                </>
+              )}
+              <Link className="button button-dark header-cta" href="/quote">
+                Request a Quote <span>↗</span>
+              </Link>
+            </div>
+          )}
 
           <button
             type="button"
@@ -492,10 +323,10 @@ export default function SiteHeader() {
             <img
               src="/images/mk-logo-transparent.png"
               alt="Miss Kudi Productions"
-              width={50}
-              height={50}
+              width={48}
+              height={48}
               className="wordmark-logo-img"
-              style={{ width: 50, height: 50 }}
+              style={{ width: 48, height: 48 }}
             />
             <div
               id={drawerTitleId}
@@ -506,7 +337,7 @@ export default function SiteHeader() {
                 color: "var(--muted)",
               }}
             >
-              {isInternalRoute && authenticated
+              {authenticated
                 ? ACCESS_TIER_LABELS[user.accessTier]
                 : "LAGOS GARMENT MANUFACTURING"}
             </div>
@@ -521,10 +352,10 @@ export default function SiteHeader() {
           </button>
         </div>
 
-        {isInternalRoute && authenticated && (
+        {authenticated && (
           <div className="mobile-drawer-session-card">
             <div className="ticket-label">
-              ACTIVE STAFF SESSION ·{" "}
+              ACTIVE SESSION ·{" "}
               {sessionMeta?.rememberMe ? "30D WORKSTATION" : "8H SHIFT"}
             </div>
             <div style={{ fontWeight: 700, fontSize: 14, marginTop: 4 }}>
@@ -557,7 +388,7 @@ export default function SiteHeader() {
                 onClick={handleSignOut}
                 disabled={signingOut}
               >
-                Sign Out
+                {signingOut ? "Signing out..." : "Sign Out"}
               </button>
             </div>
           </div>
@@ -593,15 +424,15 @@ export default function SiteHeader() {
                   style={{ width: "100%" }}
                   onClick={() => setDrawerOpen(false)}
                 >
-                  Open Staff Dashboard <span>↗</span>
+                  Open Plant Console <span>→</span>
                 </Link>
                 <Link
-                  href="/tracker"
+                  href="/"
                   className="button button-light"
                   style={{ width: "100%", border: "1px solid var(--line)" }}
                   onClick={() => setDrawerOpen(false)}
                 >
-                  Internal Order Tracker <span>⌖</span>
+                  Public Website <span>↗</span>
                 </Link>
               </>
             ) : (
@@ -612,7 +443,7 @@ export default function SiteHeader() {
                   style={{ width: "100%" }}
                   onClick={() => setDrawerOpen(false)}
                 >
-                  Sign In to Operations OS <span>→</span>
+                  Sign In to Operations <span>→</span>
                 </Link>
                 <Link
                   href="/reset-password"
@@ -620,7 +451,7 @@ export default function SiteHeader() {
                   style={{ width: "100%", border: "1px solid var(--line)" }}
                   onClick={() => setDrawerOpen(false)}
                 >
-                  Reset Factory Password <span>↺</span>
+                  Reset Password <span>↺</span>
                 </Link>
               </>
             )
@@ -662,7 +493,7 @@ export default function SiteHeader() {
                 }`}
               >
                 <span aria-hidden="true">⊞</span>
-                <span>Station</span>
+                <span>Console</span>
               </Link>
               <Link
                 href="/workspace"
@@ -693,15 +524,15 @@ export default function SiteHeader() {
                 <span aria-hidden="true">⌖</span>
                 <span>Tracker</span>
               </Link>
-              <Link
-                href="/login"
-                className={`mobile-dock-item ${
-                  pathname.startsWith("/login") ? "active" : ""
-                }`}
+              <button
+                type="button"
+                className="mobile-dock-item mobile-dock-btn"
+                onClick={handleSignOut}
+                disabled={signingOut}
               >
-                <span aria-hidden="true">👤</span>
-                <span>Account</span>
-              </Link>
+                <span aria-hidden="true">⇥</span>
+                <span>Sign Out</span>
+              </button>
             </>
           ) : (
             <>

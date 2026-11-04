@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:init": "node --env-file=.env.local db/init-neon.mjs"
+    "db:init": "node --env-file=.env.local db/init-db.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

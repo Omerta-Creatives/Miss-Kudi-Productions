@@ -1,28 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   clearSessionCookies,
-  ensureAuthSchemaInNeon,
+  ensureAuthSchema,
   extractSessionTokenFromRequest,
   guardSameOriginMutation,
   verifySessionToken,
 } from "../../../lib/auth-server";
-import { executeNeonSql, getNeonConnectionString } from "../../../lib/neon-clerk";
+import {
+  executeSqlQuery,
+  getDatabaseConnectionString,
+} from "../../../lib/database";
+import {
+  attachRateLimitHeaders,
+  enforceRequestRateLimit,
+  RATE_LIMIT_PROFILES,
+} from "../../../lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   const blocked = guardSameOriginMutation(request);
   if (blocked) return blocked;
 
+  const rateCheck = enforceRequestRateLimit(
+    request,
+    RATE_LIMIT_PROFILES.authMutation
+  );
+  if (rateCheck.blocked) return rateCheck.blocked;
+
   const rawToken = extractSessionTokenFromRequest(request);
   const session = await verifySessionToken(rawToken);
 
-  if (session && getNeonConnectionString()) {
+  if (session && getDatabaseConnectionString()) {
     try {
-      await ensureAuthSchemaInNeon();
-      await executeNeonSql(
+      await ensureAuthSchema();
+      await executeSqlQuery(
         `UPDATE auth_sessions SET revoked_at = NOW() WHERE id = $1`,
         [session.sid]
       );
-      await executeNeonSql(
+      await executeSqlQuery(
         `INSERT INTO factory_audit_logs (id, action, actor, role, target_ref, summary)
          VALUES ($1,$2,$3,$4,$5,$6)`,
         [
@@ -41,7 +55,6 @@ export async function POST(request: NextRequest) {
 
   const response = NextResponse.json({ ok: true, signedOut: true });
   clearSessionCookies(response, request);
-  // modern-web-guidance (security §Clear-Site-Data): terminate session cookies cleanly
   response.headers.set("Clear-Site-Data", '"cookies"');
-  return response;
+  return attachRateLimitHeaders(response, rateCheck.result);
 }
