@@ -25,6 +25,7 @@ import {
   ProductionStage,
   saveArtisans,
   saveInventory,
+  saveLocalPasswordHash,
   saveOrders,
   setActiveBranchId,
   setCurrentSessionUser,
@@ -90,12 +91,14 @@ export default function RoleDashboardPage() {
   const [newStaffForm, setNewStaffForm] = useState({
     name: "",
     email: "",
+    password: "",
     accessTier: "admin" as UserAccessTier,
     role: "production_manager" as ArtisanRole,
     station: "Planning Office 1",
     specialty: "Plant Scheduling, Merchandising & Quality Oversight",
     shiftStatus: "CLOCKED_IN" as ArtisanStaff["shiftStatus"],
   });
+  const [editStaffPassword, setEditStaffPassword] = useState("");
 
   const [newSkuForm, setNewSkuForm] = useState({
     sku: "",
@@ -412,8 +415,19 @@ export default function RoleDashboardPage() {
     fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...created, actor: user.name }),
-    }).catch(() => {});
+      body: JSON.stringify({
+        ...created,
+        password: newStaffForm.password.trim() || undefined,
+        actor: user.name,
+      }),
+    })
+      .then((r) => r.json())
+      .then((resData) => {
+        if (resData?.passwordHash) {
+          saveLocalPasswordHash(created.email, resData.passwordHash);
+        }
+      })
+      .catch(() => {});
 
     appendAuditLog({
       action: "rbac.user_created",
@@ -426,6 +440,7 @@ export default function RoleDashboardPage() {
     setNewStaffForm({
       name: "",
       email: "",
+      password: "",
       accessTier: "staff",
       role: "tailor",
       station: "Sewing Line 1",
@@ -455,21 +470,36 @@ export default function RoleDashboardPage() {
       setCurrentSessionUser(updated);
     }
 
+    const nextPassword = editStaffPassword.trim();
     fetch("/api/admin/users", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...updated, actor: user.name }),
-    }).catch(() => {});
+      body: JSON.stringify({
+        ...updated,
+        password: nextPassword || undefined,
+        actor: user.name,
+      }),
+    })
+      .then((r) => r.json())
+      .then((resData) => {
+        if (resData?.passwordHash) {
+          saveLocalPasswordHash(updated.email, resData.passwordHash);
+        }
+      })
+      .catch(() => {});
 
     appendAuditLog({
       action: "rbac.user_updated",
       actor: user.name,
       role: ACCESS_TIER_LABELS[user.accessTier],
       targetRef: updated.email,
-      summary: `Updated ${updated.name} (${updated.accessTier.toUpperCase()} · ${ARTISAN_ROLE_LABELS[updated.role]}).`,
+      summary: `Updated ${updated.name} (${updated.accessTier.toUpperCase()} · ${ARTISAN_ROLE_LABELS[updated.role]})${nextPassword ? " and rotated login password" : ""}.`,
     });
+    setEditStaffPassword("");
     setEditingStaff(null);
-    showToast(`Updated account for ${updated.name}.`);
+    showToast(
+      `Updated account for ${updated.name}${nextPassword ? " (password rotated)" : ""}.`
+    );
   };
 
   const handleDeleteBranchStaff = (target: ArtisanStaff) => {
@@ -2444,16 +2474,54 @@ export default function RoleDashboardPage() {
               />
             </label>
           </div>
-          <label>
-            Technical Specialty
-            <input
-              name="specialty"
-              value={newStaffForm.specialty}
-              onChange={(e) =>
-                setNewStaffForm((p) => ({ ...p, specialty: e.target.value }))
-              }
-            />
-          </label>
+          <div className="form-row">
+            <label>
+              Initial Password
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 400,
+                  color: "var(--muted)",
+                  marginBottom: 4,
+                }}
+              >
+                8+ characters (optional — staff can also use OTP Reset Password)
+              </span>
+              <input
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                placeholder="Set initial sign-in password"
+                value={newStaffForm.password}
+                onChange={(e) =>
+                  setNewStaffForm((p) => ({ ...p, password: e.target.value }))
+                }
+              />
+            </label>
+            <label>
+              Technical Specialty
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 400,
+                  color: "var(--muted)",
+                  marginBottom: 4,
+                }}
+              >
+                Assigned machinery, QA scope, or CAD focus
+              </span>
+              <input
+                name="specialty"
+                value={newStaffForm.specialty}
+                onChange={(e) =>
+                  setNewStaffForm((p) => ({ ...p, specialty: e.target.value }))
+                }
+              />
+            </label>
+          </div>
           <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
             <button
               type="submit"
@@ -2477,7 +2545,10 @@ export default function RoleDashboardPage() {
       {/* EDIT ADMIN / SPECIALIST MODAL */}
       <ModalDialog
         open={Boolean(editingStaff)}
-        onClose={() => setEditingStaff(null)}
+        onClose={() => {
+          setEditStaffPassword("");
+          setEditingStaff(null);
+        }}
         title={`Edit Account — ${editingStaff?.name || ""}`}
         maxWidth={540}
       >
@@ -2624,6 +2695,37 @@ export default function RoleDashboardPage() {
                 />
               </label>
             </div>
+            <label>
+              Set / Reset Sign-In Password (Optional)
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 400,
+                  color: "var(--muted)",
+                  marginBottom: 4,
+                }}
+              >
+                Minimum 8 characters — clears any failed-login lockout, or{" "}
+                <Link
+                  href={`/reset-password?email=${encodeURIComponent(
+                    editingStaff.email
+                  )}`}
+                  style={{ textDecoration: "underline", color: "var(--ink)" }}
+                >
+                  open OTP recovery
+                </Link>
+              </span>
+              <input
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                placeholder="Leave blank to keep existing password"
+                value={editStaffPassword}
+                onChange={(e) => setEditStaffPassword(e.target.value)}
+              />
+            </label>
             <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
               <button
                 type="submit"
@@ -2636,7 +2738,10 @@ export default function RoleDashboardPage() {
                 type="button"
                 className="button button-light"
                 style={{ border: "1px solid var(--line)" }}
-                onClick={() => setEditingStaff(null)}
+                onClick={() => {
+                  setEditStaffPassword("");
+                  setEditingStaff(null);
+                }}
               >
                 Cancel
               </button>

@@ -20,6 +20,7 @@ import {
   loadOrders,
   saveArtisans,
   saveBranches,
+  saveLocalPasswordHash,
   setActiveBranchId,
   setCurrentSessionUser,
   UserAccessTier,
@@ -60,6 +61,7 @@ export default function SuperadminHqPage() {
   // Modals for Superadmin / Admin / Staff CRUD
   const [staffModalOpen, setStaffModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<ArtisanStaff | null>(null);
+  const [editStaffPassword, setEditStaffPassword] = useState("");
   const [deletingStaff, setDeletingStaff] = useState<ArtisanStaff | null>(null);
 
   const [newBranch, setNewBranch] = useState({
@@ -417,10 +419,17 @@ export default function SuperadminHqPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...created,
-          password: newStaff.password || undefined,
+          password: newStaff.password.trim() || undefined,
           actor: currentUser.name,
         }),
-      }).catch(() => {});
+      })
+        .then((r) => r.json())
+        .then((resData) => {
+          if (resData?.passwordHash) {
+            saveLocalPasswordHash(created.email, resData.passwordHash);
+          }
+        })
+        .catch(() => {});
 
       const logs = appendAuditLog({
         action: "rbac.user_created",
@@ -480,11 +489,23 @@ export default function SuperadminHqPage() {
         setCurrentSessionUser(updatedRecord);
       }
 
+      const nextPassword = editStaffPassword.trim();
       fetch("/api/admin/users", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...updatedRecord, actor: currentUser.name }),
-      }).catch(() => {});
+        body: JSON.stringify({
+          ...updatedRecord,
+          password: nextPassword || undefined,
+          actor: currentUser.name,
+        }),
+      })
+        .then((r) => r.json())
+        .then((resData) => {
+          if (resData?.passwordHash) {
+            saveLocalPasswordHash(updatedRecord.email, resData.passwordHash);
+          }
+        })
+        .catch(() => {});
 
       const logs = appendAuditLog({
         action: "rbac.user_updated",
@@ -493,12 +514,17 @@ export default function SuperadminHqPage() {
         targetRef: updatedRecord.email,
         summary: `Edited ${updatedRecord.accessTier.toUpperCase()} profile for ${updatedRecord.name} (${
           ARTISAN_ROLE_LABELS[updatedRecord.role]
-        } · ${updatedRecord.station}).`,
+        } · ${updatedRecord.station})${
+          nextPassword ? " and rotated login password" : ""
+        }.`,
       });
       setAuditLogs(logs);
+      setEditStaffPassword("");
       setEditingStaff(null);
       showNotice(
-        `Saved updates for ${updatedRecord.name} (${updatedRecord.accessTier.toUpperCase()}).`
+        `Saved updates for ${updatedRecord.name} (${updatedRecord.accessTier.toUpperCase()})${
+          nextPassword ? " · password rotated" : ""
+        }.`
       );
     } finally {
       setSubmitting(false);
@@ -1177,7 +1203,7 @@ export default function SuperadminHqPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="table-select"
-                style={{ minWidth: 210 }}
+                style={{ flex: "1 1 180px", minWidth: 0 }}
               />
               <select
                 aria-label="Filter by Facility Branch"
@@ -1758,7 +1784,10 @@ export default function SuperadminHqPage() {
       {/* EDIT SUPERADMIN / ADMIN / STAFF MODAL */}
       <ModalDialog
         open={Boolean(editingStaff)}
-        onClose={() => setEditingStaff(null)}
+        onClose={() => {
+          setEditStaffPassword("");
+          setEditingStaff(null);
+        }}
         title={`Edit Account — ${editingStaff?.name || ""}`}
         maxWidth={580}
       >
@@ -1955,6 +1984,37 @@ export default function SuperadminHqPage() {
                 </select>
               </label>
             </div>
+            <label>
+              Set / Reset Sign-In Password (Optional)
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 400,
+                  color: "var(--muted)",
+                  marginBottom: 4,
+                }}
+              >
+                Minimum 8 characters — clears any failed-login lockout, or{" "}
+                <Link
+                  href={`/reset-password?email=${encodeURIComponent(
+                    editingStaff.email
+                  )}`}
+                  style={{ textDecoration: "underline", color: "var(--ink)" }}
+                >
+                  open OTP recovery
+                </Link>
+              </span>
+              <input
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                placeholder="Leave blank to keep existing password"
+                value={editStaffPassword}
+                onChange={(e) => setEditStaffPassword(e.target.value)}
+              />
+            </label>
             <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
               <button
                 type="submit"
@@ -1968,7 +2028,10 @@ export default function SuperadminHqPage() {
                 type="button"
                 className="button button-light"
                 style={{ border: "1px solid var(--line)" }}
-                onClick={() => setEditingStaff(null)}
+                onClick={() => {
+                  setEditStaffPassword("");
+                  setEditingStaff(null);
+                }}
               >
                 Cancel
               </button>

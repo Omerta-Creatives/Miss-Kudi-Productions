@@ -493,28 +493,146 @@ const STORAGE_KEYS = {
   AUDIT: "mkp_nexus_audit_v5",
   DRAFT_SIZE_MATRIX: "mkp_nexus_draft_sizes_v5",
   CURRENT_USER: "mkp_nexus_session_user_v5",
+  SESSION_META: "mkp_nexus_session_meta_v5",
+  REMEMBERED_EMAIL: "mkp_nexus_remembered_email_v5",
+  PASSWORD_VAULT: "mkp_nexus_pwd_hashes_v5",
   ACTIVE_BRANCH: "mkp_nexus_active_branch_v5",
 };
 
+export interface ClientSessionMeta {
+  authenticated: boolean;
+  rememberMe: boolean;
+  expiresAt: string;
+  signedInAt: string;
+  sessionId?: string;
+}
+
 // --- RBAC Session Helpers ---
+export function getCurrentSessionMeta(): ClientSessionMeta | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const rawSession =
+      sessionStorage.getItem(STORAGE_KEYS.SESSION_META) ||
+      localStorage.getItem(STORAGE_KEYS.SESSION_META);
+    if (!rawSession) return null;
+    const parsed = JSON.parse(rawSession) as ClientSessionMeta;
+    if (parsed.expiresAt && new Date(parsed.expiresAt).getTime() <= Date.now()) {
+      clearCurrentSessionUser();
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function isSessionAuthenticated(): boolean {
+  const meta = getCurrentSessionMeta();
+  return Boolean(meta?.authenticated);
+}
+
 export function getCurrentSessionUser(): ArtisanStaff {
   if (typeof window === "undefined") return INITIAL_ARTISANS[0];
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    const meta = getCurrentSessionMeta();
+    const raw =
+      sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER) ||
+      localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     if (!raw) return INITIAL_ARTISANS[0];
+    if (meta && new Date(meta.expiresAt).getTime() <= Date.now()) {
+      clearCurrentSessionUser();
+      return INITIAL_ARTISANS[0];
+    }
     return JSON.parse(raw);
   } catch {
     return INITIAL_ARTISANS[0];
   }
 }
 
-export function setCurrentSessionUser(user: ArtisanStaff) {
+export function setCurrentSessionUser(
+  user: ArtisanStaff,
+  options?: { rememberMe?: boolean; expiresAt?: string; sessionId?: string }
+) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+  const existingMeta = getCurrentSessionMeta();
+  const rememberMe = options?.rememberMe ?? existingMeta?.rememberMe ?? true;
+  const ttlMs = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000;
+  const meta: ClientSessionMeta = {
+    authenticated: true,
+    rememberMe,
+    expiresAt:
+      options?.expiresAt || new Date(Date.now() + ttlMs).toISOString(),
+    signedInAt: new Date().toISOString(),
+    sessionId: options?.sessionId || existingMeta?.sessionId,
+  };
+
+  if (rememberMe) {
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+    localStorage.setItem(STORAGE_KEYS.SESSION_META, JSON.stringify(meta));
+    localStorage.setItem(STORAGE_KEYS.REMEMBERED_EMAIL, user.email.toLowerCase());
+    sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    sessionStorage.removeItem(STORAGE_KEYS.SESSION_META);
+  } else {
+    sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+    sessionStorage.setItem(STORAGE_KEYS.SESSION_META, JSON.stringify(meta));
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    localStorage.removeItem(STORAGE_KEYS.SESSION_META);
+  }
+
   if (user.branchId) {
     localStorage.setItem(STORAGE_KEYS.ACTIVE_BRANCH, user.branchId);
   }
   window.dispatchEvent(new CustomEvent("mkp:session-change", { detail: user }));
+}
+
+export function clearCurrentSessionUser(options?: { forgetEmail?: boolean }) {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+  sessionStorage.removeItem(STORAGE_KEYS.SESSION_META);
+  localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+  localStorage.removeItem(STORAGE_KEYS.SESSION_META);
+  if (options?.forgetEmail) {
+    localStorage.removeItem(STORAGE_KEYS.REMEMBERED_EMAIL);
+  }
+  window.dispatchEvent(new CustomEvent("mkp:session-change", { detail: null }));
+}
+
+export function getRememberedEmail(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return localStorage.getItem(STORAGE_KEYS.REMEMBERED_EMAIL) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function setRememberedEmail(email: string, remember: boolean) {
+  if (typeof window === "undefined") return;
+  if (remember && email.trim()) {
+    localStorage.setItem(
+      STORAGE_KEYS.REMEMBERED_EMAIL,
+      email.trim().toLowerCase()
+    );
+  } else {
+    localStorage.removeItem(STORAGE_KEYS.REMEMBERED_EMAIL);
+  }
+}
+
+export function loadLocalPasswordHashes(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.PASSWORD_VAULT);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveLocalPasswordHash(email: string, passwordHash: string) {
+  if (typeof window === "undefined" || !email || !passwordHash) return;
+  const current = loadLocalPasswordHashes();
+  current[email.trim().toLowerCase()] = passwordHash;
+  localStorage.setItem(STORAGE_KEYS.PASSWORD_VAULT, JSON.stringify(current));
 }
 
 export function isSuperAdminUser(user?: ArtisanStaff | null): boolean {

@@ -5,5 +5,7 @@ out
 !.env.example
 .vercel
 .DS_Store
+._*
+*.tsbuildinfo
 .agent
 .claude

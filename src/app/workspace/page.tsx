@@ -25,6 +25,7 @@ import {
   saveBrandClients,
   saveExpenses,
   saveInventory,
+  saveLocalPasswordHash,
   saveOrders,
   savePurchaseOrders,
   STAGE_METADATA,
@@ -78,11 +79,13 @@ export default function FactoryWorkspacePage() {
   const [newArtisan, setNewArtisan] = useState({
     name: "",
     email: "",
+    password: "",
     accessTier: "staff" as UserAccessTier,
     role: "tailor" as ArtisanRole,
     specialty: "",
     station: "Sewing Line 1",
   });
+  const [editArtisanPassword, setEditArtisanPassword] = useState("");
 
   // New Expense form state
   const [newExpense, setNewExpense] = useState({
@@ -236,8 +239,18 @@ export default function FactoryWorkspacePage() {
     fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(created),
-    }).catch(() => {});
+      body: JSON.stringify({
+        ...created,
+        password: newArtisan.password.trim() || undefined,
+      }),
+    })
+      .then((r) => r.json())
+      .then((resData) => {
+        if (resData?.passwordHash) {
+          saveLocalPasswordHash(created.email, resData.passwordHash);
+        }
+      })
+      .catch(() => {});
     const logs = appendAuditLog({
       action: "artisan.onboarded",
       actor: "Kudi Lasisi",
@@ -249,6 +262,7 @@ export default function FactoryWorkspacePage() {
     setNewArtisan({
       name: "",
       email: "",
+      password: "",
       accessTier: "staff",
       role: "tailor",
       specialty: "",
@@ -268,21 +282,35 @@ export default function FactoryWorkspacePage() {
     );
     setArtisans(next);
     saveArtisans(next);
+    const nextPassword = editArtisanPassword.trim();
     fetch("/api/admin/users", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editingArtisan),
-    }).catch(() => {});
+      body: JSON.stringify({
+        ...editingArtisan,
+        password: nextPassword || undefined,
+      }),
+    })
+      .then((r) => r.json())
+      .then((resData) => {
+        if (resData?.passwordHash) {
+          saveLocalPasswordHash(editingArtisan.email, resData.passwordHash);
+        }
+      })
+      .catch(() => {});
     const logs = appendAuditLog({
       action: "rbac.user_updated",
       actor: "Kudi Lasisi",
       role: "Superadmin / Admin CRUD",
       targetRef: editingArtisan.email,
-      summary: `Updated ${editingArtisan.name} (${editingArtisan.accessTier.toUpperCase()} · ${ARTISAN_ROLE_LABELS[editingArtisan.role]}).`,
+      summary: `Updated ${editingArtisan.name} (${editingArtisan.accessTier.toUpperCase()} · ${ARTISAN_ROLE_LABELS[editingArtisan.role]})${nextPassword ? " and rotated login password" : ""}.`,
     });
     setAuditLogs(logs);
+    setEditArtisanPassword("");
     setEditingArtisan(null);
-    showToast(`Updated account for ${editingArtisan.name}.`);
+    showToast(
+      `Updated account for ${editingArtisan.name}${nextPassword ? " (password rotated)" : ""}.`
+    );
   };
 
   const handleDeleteArtisan = (art: ArtisanStaff) => {
@@ -734,7 +762,12 @@ export default function FactoryWorkspacePage() {
               </Link>
             </div>
 
-            <div className="table-scroll-wrap">
+            <div
+              className="table-scroll-wrap"
+              tabIndex={0}
+              role="region"
+              aria-label="Scrollable production data table"
+            >
               <table className="size-chart workspace-table">
                 <thead>
                   <tr>
@@ -929,7 +962,12 @@ export default function FactoryWorkspacePage() {
               </button>
             </div>
 
-            <div className="table-scroll-wrap">
+            <div
+              className="table-scroll-wrap"
+              tabIndex={0}
+              role="region"
+              aria-label="Scrollable production data table"
+            >
               <table className="size-chart workspace-table">
                 <thead>
                   <tr>
@@ -1017,7 +1055,12 @@ export default function FactoryWorkspacePage() {
               </div>
             </div>
 
-            <div className="table-scroll-wrap">
+            <div
+              className="table-scroll-wrap"
+              tabIndex={0}
+              role="region"
+              aria-label="Scrollable production data table"
+            >
               <table className="size-chart workspace-table">
                 <thead>
                   <tr>
@@ -1121,7 +1164,12 @@ export default function FactoryWorkspacePage() {
             <h4 style={{ marginTop: 32, marginBottom: 12 }}>
               Supplier Purchase Orders (Textile Mills &amp; Trim Vendors)
             </h4>
-            <div className="table-scroll-wrap">
+            <div
+              className="table-scroll-wrap"
+              tabIndex={0}
+              role="region"
+              aria-label="Scrollable production data table"
+            >
               <table className="size-chart workspace-table">
                 <thead>
                   <tr>
@@ -1210,7 +1258,13 @@ export default function FactoryWorkspacePage() {
               ))}
             </div>
 
-            <div className="table-scroll-wrap" style={{ marginTop: 20 }}>
+            <div
+              className="table-scroll-wrap"
+              tabIndex={0}
+              role="region"
+              aria-label="Scrollable B2B partner directory table"
+              style={{ marginTop: 20 }}
+            >
               <table className="size-chart workspace-table">
                 <thead>
                   <tr>
@@ -1409,7 +1463,12 @@ export default function FactoryWorkspacePage() {
               </button>
             </form>
 
-            <div className="table-scroll-wrap">
+            <div
+              className="table-scroll-wrap"
+              tabIndex={0}
+              role="region"
+              aria-label="Scrollable production data table"
+            >
               <table className="size-chart workspace-table">
                 <thead>
                   <tr>
@@ -1456,7 +1515,12 @@ export default function FactoryWorkspacePage() {
             <h4 style={{ marginTop: 36, marginBottom: 12 }}>
               Immutable Factory &amp; QC Security Audit Trail
             </h4>
-            <div className="table-scroll-wrap">
+            <div
+              className="table-scroll-wrap"
+              tabIndex={0}
+              role="region"
+              aria-label="Scrollable production data table"
+            >
               <table className="size-chart workspace-table">
                 <thead>
                   <tr>
@@ -1585,16 +1649,54 @@ export default function FactoryWorkspacePage() {
               />
             </label>
           </div>
-          <label>
-            Technical Specialty &amp; Machinery
-            <input
-              placeholder="e.g. Gerber CAD Grading, Heavy Denim Lockstitch, or AQL 2.5 Inspection"
-              value={newArtisan.specialty}
-              onChange={(e) =>
-                setNewArtisan((p) => ({ ...p, specialty: e.target.value }))
-              }
-            />
-          </label>
+          <div className="form-row">
+            <label>
+              Initial Password
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 400,
+                  color: "var(--muted)",
+                  marginBottom: 4,
+                }}
+              >
+                8+ characters (optional — or use OTP Reset Password)
+              </span>
+              <input
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                placeholder="Set initial sign-in password"
+                value={newArtisan.password}
+                onChange={(e) =>
+                  setNewArtisan((p) => ({ ...p, password: e.target.value }))
+                }
+              />
+            </label>
+            <label>
+              Technical Specialty &amp; Machinery
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 400,
+                  color: "var(--muted)",
+                  marginBottom: 4,
+                }}
+              >
+                Assigned CAD, cutting, sewing, or QC station focus
+              </span>
+              <input
+                placeholder="e.g. Gerber CAD Grading, Heavy Denim Lockstitch"
+                value={newArtisan.specialty}
+                onChange={(e) =>
+                  setNewArtisan((p) => ({ ...p, specialty: e.target.value }))
+                }
+              />
+            </label>
+          </div>
           <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
             <button type="submit" className="button button-dark" style={{ flex: 1 }}>
               Add Account to Roster
@@ -1705,7 +1807,10 @@ export default function FactoryWorkspacePage() {
       {/* Edit Superadmin / Admin / Artisan Modal */}
       <ModalDialog
         open={Boolean(editingArtisan)}
-        onClose={() => setEditingArtisan(null)}
+        onClose={() => {
+          setEditArtisanPassword("");
+          setEditingArtisan(null);
+        }}
         title={`Edit Account — ${editingArtisan?.name || ""}`}
         maxWidth={540}
       >
@@ -1813,6 +1918,37 @@ export default function FactoryWorkspacePage() {
                 />
               </label>
             </div>
+            <label>
+              Set / Reset Sign-In Password (Optional)
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 400,
+                  color: "var(--muted)",
+                  marginBottom: 4,
+                }}
+              >
+                Minimum 8 characters — clears any failed-login lockout, or{" "}
+                <Link
+                  href={`/reset-password?email=${encodeURIComponent(
+                    editingArtisan.email
+                  )}`}
+                  style={{ textDecoration: "underline", color: "var(--ink)" }}
+                >
+                  open OTP recovery
+                </Link>
+              </span>
+              <input
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                placeholder="Leave blank to keep existing password"
+                value={editArtisanPassword}
+                onChange={(e) => setEditArtisanPassword(e.target.value)}
+              />
+            </label>
             <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
               <button
                 type="submit"
@@ -1825,7 +1961,10 @@ export default function FactoryWorkspacePage() {
                 type="button"
                 className="button button-light"
                 style={{ border: "1px solid var(--line)" }}
-                onClick={() => setEditingArtisan(null)}
+                onClick={() => {
+                  setEditArtisanPassword("");
+                  setEditingArtisan(null);
+                }}
               >
                 Cancel
               </button>

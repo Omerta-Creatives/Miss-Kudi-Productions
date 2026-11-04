@@ -21,6 +21,12 @@ CREATE TABLE IF NOT EXISTS staff_users (
   clerk_user_id TEXT UNIQUE,
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
+  password_hash TEXT,
+  must_reset_password BOOLEAN NOT NULL DEFAULT FALSE,
+  failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+  locked_until TIMESTAMPTZ,
+  last_login_at TIMESTAMPTZ,
+  password_changed_at TIMESTAMPTZ,
   access_tier TEXT NOT NULL DEFAULT 'staff',
   artisan_role TEXT NOT NULL DEFAULT 'tailor',
   branch_id TEXT REFERENCES factory_branches(id) ON DELETE SET NULL,
@@ -32,6 +38,27 @@ CREATE TABLE IF NOT EXISTS staff_users (
   qc_pass_rate NUMERIC(5,2) NOT NULL DEFAULT 99.00,
   shift_status TEXT NOT NULL DEFAULT 'CLOCKED_IN',
   floor_status TEXT NOT NULL DEFAULT 'Active on Floor',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  email TEXT NOT NULL,
+  access_tier TEXT NOT NULL,
+  remember_me BOOLEAN NOT NULL DEFAULT FALSE,
+  user_agent TEXT NOT NULL DEFAULT '',
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

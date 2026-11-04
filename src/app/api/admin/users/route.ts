@@ -5,6 +5,11 @@ import {
   isClerkSecretConfigured,
 } from "../../../lib/neon-clerk";
 import {
+  ensureAuthSchemaInNeon,
+  guardSameOriginMutation,
+  hashPassword,
+} from "../../../lib/auth-server";
+import {
   ArtisanRole,
   ArtisanStaff,
   INITIAL_ARTISANS,
@@ -73,6 +78,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const blocked = guardSameOriginMutation(request);
+  if (blocked) return blocked;
   try {
     const body = await request.json();
     const {
@@ -103,6 +110,10 @@ export async function POST(request: Request) {
 
     const userId = id || `art-${Date.now()}`;
     let clerkUserId: string | null = null;
+    const passwordHash =
+      password && String(password).length >= 6
+        ? await hashPassword(String(password))
+        : null;
 
     // Optional live Clerk user provisioning if CLERK_SECRET_KEY is configured
     if (isClerkSecretConfigured()) {
@@ -171,14 +182,17 @@ export async function POST(request: Request) {
     }
 
     if (getNeonConnectionString()) {
+      await ensureAuthSchemaInNeon();
       await executeNeonSql(
         `INSERT INTO staff_users (
-          id, clerk_user_id, name, email, access_tier, artisan_role,
+          id, clerk_user_id, name, email, password_hash, access_tier, artisan_role,
           branch_id, branch_name, specialty, station, active_runs,
-          units_completed_month, qc_pass_rate, shift_status, floor_status
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+          units_completed_month, qc_pass_rate, shift_status, floor_status, password_changed_at
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, CASE WHEN $5 IS NOT NULL THEN NOW() ELSE NULL END)
         ON CONFLICT (email) DO UPDATE SET
           name = EXCLUDED.name,
+          password_hash = COALESCE(EXCLUDED.password_hash, staff_users.password_hash),
+          password_changed_at = CASE WHEN EXCLUDED.password_hash IS NOT NULL THEN NOW() ELSE staff_users.password_changed_at END,
           access_tier = EXCLUDED.access_tier,
           artisan_role = EXCLUDED.artisan_role,
           branch_name = EXCLUDED.branch_name,
@@ -191,6 +205,7 @@ export async function POST(request: Request) {
           clerkUserId,
           name.trim(),
           email.trim().toLowerCase(),
+          passwordHash,
           accessTier,
           role,
           null, // Avoid FK mismatch between local 'br-yaba' and Neon 'BR-LOS-YABA'
@@ -222,6 +237,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       clerkUserId,
+      passwordHash,
       user: {
         id: userId,
         name: name.trim(),
@@ -248,12 +264,15 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const blocked = guardSameOriginMutation(request);
+  if (blocked) return blocked;
   try {
     const body = await request.json();
     const {
       id,
       name,
       email,
+      password,
       accessTier,
       role,
       branchId,
@@ -275,7 +294,13 @@ export async function PUT(request: Request) {
       );
     }
 
+    const passwordHash =
+      password && String(password).length >= 6
+        ? await hashPassword(String(password))
+        : null;
+
     if (getNeonConnectionString()) {
+      await ensureAuthSchemaInNeon();
       await executeNeonSql(
         `UPDATE staff_users
          SET
@@ -290,7 +315,11 @@ export async function PUT(request: Request) {
            units_completed_month = COALESCE($10, units_completed_month),
            qc_pass_rate = COALESCE($11, qc_pass_rate),
            shift_status = COALESCE($12, shift_status),
-           floor_status = COALESCE($13, floor_status)
+           floor_status = COALESCE($13, floor_status),
+           password_hash = COALESCE($14, password_hash),
+           password_changed_at = CASE WHEN $14 IS NOT NULL THEN NOW() ELSE password_changed_at END,
+           failed_login_attempts = CASE WHEN $14 IS NOT NULL THEN 0 ELSE failed_login_attempts END,
+           locked_until = CASE WHEN $14 IS NOT NULL THEN NULL ELSE locked_until END
          WHERE id = $1 OR email = $3`,
         [
           id || "",
@@ -306,6 +335,7 @@ export async function PUT(request: Request) {
           qcPassRate !== undefined ? Number(qcPassRate) : null,
           shiftStatus ?? null,
           status ?? null,
+          passwordHash,
         ]
       );
 
@@ -318,12 +348,12 @@ export async function PUT(request: Request) {
           actor,
           "Superadmin / Admin CRUD",
           email || id,
-          `Updated account ${name || email || id} (Tier: ${accessTier || "unchanged"}, Role: ${role || "unchanged"}).`,
+          `Updated account ${name || email || id} (Tier: ${accessTier || "unchanged"}, Role: ${role || "unchanged"}${passwordHash ? ", Password updated" : ""}).`,
         ]
       );
     }
 
-    return NextResponse.json({ ok: true, id, branchId });
+    return NextResponse.json({ ok: true, id, branchId, passwordHash });
   } catch (err: any) {
     return NextResponse.json(
       { ok: false, error: err?.message || "Failed to update account." },
@@ -333,6 +363,8 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const blocked = guardSameOriginMutation(request);
+  if (blocked) return blocked;
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id") || "";
