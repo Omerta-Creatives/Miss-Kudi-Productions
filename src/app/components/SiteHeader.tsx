@@ -192,7 +192,7 @@ export default function SiteHeader() {
           >
             <img
               src="/images/mk-logo-transparent.png"
-              alt="Miss Kudi Productions — Lagos Atelier"
+              alt="Miss Kudi Productions · Surulere, Lagos Atelier"
               width={64}
               height={64}
               className="wordmark-logo-img"
@@ -339,7 +339,7 @@ export default function SiteHeader() {
             >
               {authenticated
                 ? ACCESS_TIER_LABELS[user.accessTier]
-                : "LAGOS GARMENT MANUFACTURING"}
+                : "SURULERE · LAGOS MANUFACTURING"}
             </div>
           </div>
           <button

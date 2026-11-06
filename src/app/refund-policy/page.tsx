@@ -11,7 +11,7 @@ export default function RefundPolicy() {
           </div>
         </div>
         <p>All payments are non‑refundable once production has commenced. If a project is cancelled before any work starts, a full refund will be issued.</p>
-        <p>For any disputes, please contact us within 14 days of invoicing at <Link href="mailto:info@misskudi.com">info@misskudi.com</Link> or at 1 Alawode Street, Lagos, Nigeria.</p>
+        <p>For any disputes, please contact us within 14 days of invoicing at <Link href="mailto:info@misskudi.com">info@misskudi.com</Link> or at 1 Alawode Street, Surulere, Lagos, Nigeria.</p>
       </section>
     </main>
   );

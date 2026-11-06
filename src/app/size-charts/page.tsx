@@ -201,7 +201,7 @@ export default function SizeCharts() {
       <section className="marketing-stage-hero">
         <img
           src="/images/pattern-cutting-studio.jpg"
-          alt="Victoria Island and Yaba Pattern Studio CAD grading and marker layout"
+          alt="Surulere Pattern Studio CAD grading and marker layout"
           width={1920}
           height={1080}
           fetchPriority="high"
@@ -307,7 +307,7 @@ export default function SizeCharts() {
           <div className="grading-calc-header">
             <div>
               <span className="section-kicker mono">
-                VICTORIA ISLAND &amp; YABA PATTERN STUDIO
+                SURULERE CAD PATTERN &amp; GRADING STUDIO
               </span>
               <h2 style={{ margin: "8px 0 6px", fontSize: "clamp(22px, 2.6vw, 30px)" }}>
                 Interactive Bulk Order Ratio &amp; Marker Consumption Planner

@@ -17,7 +17,7 @@ export default function TermsAndConditions() {
           <li>Payments are due as outlined in the quotation; late payments may incur a 2% monthly interest.</li>
           <li>We reserve the right to refuse orders that conflict with our ethical or legal standards.</li>
         </ul>
-        <p>For full legal details, contact us at <Link href="mailto:info@misskudi.com">info@misskudi.com</Link> or at our office at 1 Alawode Street, Lagos, Nigeria.</p>
+        <p>For full legal details, contact us at <Link href="mailto:info@misskudi.com">info@misskudi.com</Link> or at our office at 1 Alawode Street, Surulere, Lagos, Nigeria.</p>
       </section>
     </main>
   );

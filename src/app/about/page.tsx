@@ -5,15 +5,15 @@ const PUBLIC_CRAFT_LEADS = [
   {
     role: "Production & Client Strategy",
     name: "Kudi Lasisi",
-    facility: "Yaba Flagship Production Plant",
+    facility: "Surulere Manufacturing Hub · 1 Alawode St",
     focus:
-      "Multi-facility capacity planning, private-label collection scheduling and international brand partnerships.",
+      "End-to-end floor capacity planning, private-label collection scheduling and international brand partnerships.",
     metric: "99.6% On-Time Dispatch",
   },
   {
     role: "CAD Pattern & Grading Studio",
     name: "Pattern & Grading Division",
-    facility: "Victoria Island Pattern & Sample Atelier",
+    facility: "CAD Pattern & Sample Studio · Surulere",
     focus:
       "CAD master block drafting, couture draping, first-fit toile development and XS–XXL size grading.",
     metric: "99.4% Fit Approval",
@@ -21,7 +21,7 @@ const PUBLIC_CRAFT_LEADS = [
   {
     role: "Master Cutting & Marker Studio",
     name: "Bulk Lay & Marker Division",
-    facility: "Yaba Flagship Production Plant",
+    facility: "Cutting & Marker Floor · Surulere",
     focus:
       "24-hour fabric relaxation, zero-waste marker nesting, shade-lot bundling and precision multi-ply cutting.",
     metric: "94.8% Marker Yield",
@@ -29,7 +29,7 @@ const PUBLIC_CRAFT_LEADS = [
   {
     role: "Master Tailoring & Sewing Lines",
     name: "Industrial Cut-and-Sew Division",
-    facility: "Yaba Flagship Production Plant",
+    facility: "Bulk Cut-and-Sew Floor · Surulere",
     focus:
       "Balanced industrial lockstitch, French-seam resortwear, heavyweight streetwear and structured outerwear lines.",
     metric: "98.9% Inline Pass Rate",
@@ -37,7 +37,7 @@ const PUBLIC_CRAFT_LEADS = [
   {
     role: "AQL 2.5 Quality Assurance Bay",
     name: "Quality Inspection & Finishing Team",
-    facility: "Ikeja Workwear & Export Finishing Depot",
+    facility: "AQL 2.5 QC & Finishing Bay · Surulere",
     focus:
       "36-point garment measurement verification, seam tensile testing, steam finishing and export carton sign-off.",
     metric: "AQL 2.5 Certified",
@@ -45,7 +45,7 @@ const PUBLIC_CRAFT_LEADS = [
   {
     role: "Private-Label & Merchandising Desk",
     name: "Brand Onboarding & Sampling Desk",
-    facility: "Victoria Island Pattern & Sample Atelier",
+    facility: "Client Merchandising Desk · Surulere",
     focus:
       "Tech-pack onboarding, trim & woven label sourcing, and pre-production sample approvals for fashion labels.",
     metric: "7–14 Day Sample Lead",
@@ -78,20 +78,20 @@ export default function About() {
                   01 / ABOUT MISS KUDI PRODUCTIONS
                 </span>
                 <span className="hero-fs-chip-outline mono">
-                  EST. 2018 · LAGOS, NIGERIA
+                  EST. 2018 · SURULERE, LAGOS
                 </span>
               </div>
 
               <h1 className="hero-fs-title">
                 Built for brands.
                 <br />
-                <em>Engineered for scale in Lagos.</em>
+                <em>Engineered for scale in Surulere.</em>
               </h1>
 
               <p className="hero-fs-description">
                 Miss Kudi Productions bridges artisanal fashion craftsmanship with industrial B2B
-                garment manufacturing across three specialized Lagos production facilities — giving
-                emerging and established labels predictable quality at scale.
+                garment manufacturing at 1 Alawode Street, Surulere, Lagos · giving emerging and
+                established labels predictable quality under one roof.
               </p>
 
               <div className="hero-fs-actions">
@@ -106,14 +106,14 @@ export default function About() {
 
             <div className="marketing-stage-card">
               <div className="marketing-stage-card-head mono">
-                <span>MULTI-PLANT NETWORK TELEMETRY</span>
-                <span>3 FACILITIES</span>
+                <span>SURULERE FACILITY TELEMETRY</span>
+                <span>1 ALAWODE ST</span>
               </div>
               <div className="marketing-stage-metrics">
                 <div>
                   <span className="mono">MONTHLY CAPACITY</span>
                   <strong className="mono">35,500+ Pcs</strong>
-                  <small>Yaba · Victoria Island · Ikeja</small>
+                  <small>1 Alawode Street, Surulere</small>
                 </div>
                 <div>
                   <span className="mono">INDUSTRIAL MACHINES</span>
@@ -127,7 +127,7 @@ export default function About() {
                 </div>
               </div>
               <a href="#philosophy" className="marketing-stage-scroll mono">
-                <span>EXPLORE OUR FACILITIES &amp; TEAMS</span>
+                <span>EXPLORE OUR SURULERE FACILITY &amp; TEAMS</span>
                 <span>↓</span>
               </a>
             </div>
@@ -170,8 +170,8 @@ export default function About() {
               <span className="ticket-label mono">01 · PATTERN &amp; GRADING STUDIO</span>
               <h3>Digital CAD Blocks &amp; Marker Efficiency</h3>
               <p>
-                Our Victoria Island and Yaba pattern designers draft master blocks, grade across
-                XS–XXL size ratios, and nest markers to achieve 94%+ fabric utilization.
+                Our Surulere pattern designers draft master blocks, grade across XS–XXL size
+                ratios, and nest markers to achieve 94%+ fabric utilization.
               </p>
             </figcaption>
           </figure>
@@ -179,7 +179,7 @@ export default function About() {
           <figure className="about-triptych-card">
             <img
               src="/images/sewing-production-line.jpg"
-              alt="Master tailors operating industrial sewing machines in Lagos"
+              alt="Master tailors operating industrial sewing machines in Surulere, Lagos"
               width={600}
               height={420}
               loading="lazy"
@@ -216,23 +216,23 @@ export default function About() {
         </div>
       </section>
 
-      {/* Three Lagos Facilities — Asymmetrical Flagship Spotlight */}
+      {/* Surulere Facility Divisions · Asymmetrical Flagship Spotlight */}
       <section
         className="section-wrap"
         style={{ paddingTop: 84, paddingBottom: 84, background: "#ebe6dd" }}
       >
         <div className="section-heading">
           <div>
-            <div className="section-kicker mono">02 / OUR THREE LAGOS PLANTS</div>
+            <div className="section-kicker mono">02 / OUR SURULERE PRODUCTION HUB</div>
             <h2>
-              Purpose-built facilities across
+              Three specialized divisions at
               <br />
-              <em>Yaba, Victoria Island &amp; Ikeja.</em>
+              <em>1 Alawode Street, Surulere.</em>
             </h2>
           </div>
           <p>
-            Combined capacity of 35,500+ units per month with dedicated power redundancy and
-            climate-controlled fabric stores.
+            35,500+ units monthly capacity under one roof in Surulere, Lagos, with dedicated power
+            redundancy and climate-controlled fabric stores.
           </p>
         </div>
 
@@ -364,7 +364,7 @@ export default function About() {
             <span className="section-kicker mono" style={{ color: "#d4af37" }}>
               PARTNER WITH MISS KUDI PRODUCTIONS
             </span>
-            <h3>Ready to schedule your collection on our Lagos lines?</h3>
+            <h3>Ready to schedule your collection on our Surulere lines?</h3>
             <p>
               Configure your garment category, unit volume, and XS–XXL grading ratio in our Quote
               Studio for an instant pro-forma estimate.

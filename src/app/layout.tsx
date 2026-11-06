@@ -3,9 +3,9 @@ import Link from "next/link";
 import SiteHeader from "./components/SiteHeader";
 
 export const metadata = {
-  title: "Miss Kudi Productions — B2B Garment Manufacturing in Lagos, Nigeria",
+  title: "Miss Kudi Productions · B2B Garment Manufacturing in Surulere, Lagos",
   description:
-    "Lagos-based B2B garment manufacturing partner for fashion brands. Bulk cut-and-sew, private-label production, CAD pattern grading, and AQL 2.5 quality control.",
+    "Surulere, Lagos B2B garment manufacturing partner for fashion brands at 1 Alawode Street, Surulere. Bulk cut-and-sew, private-label production, CAD pattern grading, and AQL 2.5 quality control.",
   icons: {
     icon: "/images/mk-logo.svg",
     apple: "/images/mk-logo-transparent.png",
@@ -25,7 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="wordmark wordmark-footer" aria-label="Miss Kudi Productions Home">
               <img
                 src="/images/mk-logo-light.png"
-                alt="Miss Kudi Productions — Lagos Atelier"
+                alt="Miss Kudi Productions · Surulere, Lagos Atelier"
                 width={76}
                 height={76}
                 className="wordmark-logo-img"
@@ -51,9 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
           <div className="footer-bottom">
             <span>© {new Date().getFullYear()} Miss Kudi Productions</span>
-            <span>
-              1 Alawode Street, Lagos, Nigeria · Yaba Flagship · Victoria Island Atelier · Ikeja Export Depot
-            </span>
+            <span>1 Alawode Street, Surulere, Lagos, Nigeria</span>
             <span>B2B GARMENT MANUFACTURING</span>
           </div>
         </footer>

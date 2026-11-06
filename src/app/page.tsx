@@ -23,7 +23,7 @@ export default function Home() {
             <span className="section-kicker mono">01 / MANIFESTO</span>
             <span className="taste-index-rule" />
             <span className="mono" style={{ fontSize: 10, color: "var(--muted)" }}>
-              LAGOS · EST. 2018
+              SURULERE, LAGOS · EST. 2018
             </span>
           </div>
 
@@ -37,7 +37,7 @@ export default function Home() {
               <div className="taste-ledger-cell">
                 <span className="ticket-label">MONTHLY CAPACITY</span>
                 <strong className="mono">35,500+ Pcs</strong>
-                <small>Across 3 Lagos facilities</small>
+                <small>1 Alawode St, Surulere hub</small>
               </div>
               <div className="taste-ledger-cell">
                 <span className="ticket-label">QUALITY BENCHMARK</span>
@@ -54,9 +54,9 @@ export default function Home() {
 
           <div className="intro-body">
             <p>
-              Miss Kudi Productions is an industrial garment manufacturing partner in Lagos,
-              Nigeria, built for emerging and established fashion labels that demand consistent
-              stitching, accurate grading, and predictable delivery windows.
+              Miss Kudi Productions is an industrial garment manufacturing partner at 1 Alawode
+              Street, Surulere, Lagos, Nigeria, built for emerging and established fashion labels
+              that demand consistent stitching, accurate grading, and predictable delivery windows.
             </p>
             <p>
               Every production order is assigned a dedicated{" "}
@@ -67,7 +67,7 @@ export default function Home() {
             </p>
             <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginTop: 12 }}>
               <Link className="underlined-link" href="/about">
-                Explore Our 3 Lagos Facilities <span>↗</span>
+                Explore Our Surulere Facility <span>↗</span>
               </Link>
               <Link className="underlined-link" href="/quote">
                 Calculate MOQ &amp; Pro-Forma Quote <span>→</span>
@@ -250,16 +250,16 @@ export default function Home() {
       >
         <div className="section-heading">
           <div>
-            <div className="section-kicker mono">05 / LAGOS MANUFACTURING NETWORK</div>
+            <div className="section-kicker mono">05 / SURULERE MANUFACTURING HUB</div>
             <h2>
-              Three specialized plants.
+              Three specialized divisions.
               <br />
-              <em>One unified quality standard.</em>
+              <em>Under one roof in Surulere.</em>
             </h2>
           </div>
           <p>
-            Dedicated facilities across Yaba, Victoria Island and Ikeja for pattern development,
-            bulk sewing and export finishing.
+            Integrated pattern development, bulk cut-and-sew lines and AQL 2.5 export finishing at
+            1 Alawode Street, Surulere, Lagos.
           </p>
         </div>
 
@@ -358,7 +358,7 @@ export default function Home() {
             <figure className="home-quote-cta-figure">
               <img
                 src="/images/lagos-atelier-lookbook.jpg"
-                alt="Victoria Island fashion atelier showroom with olive linen blazers and resortwear on brass rail"
+                alt="Surulere fashion atelier showroom with olive linen blazers and resortwear on brass rail"
                 width={720}
                 height={420}
                 loading="lazy"

@@ -9,7 +9,7 @@ export default function Quote() {
       <section className="marketing-stage-hero marketing-stage-hero-compact">
         <img
           src="/images/lagos-atelier-lookbook.jpg"
-          alt="Victoria Island fashion atelier showroom featuring olive linen blazers, ecru resortwear shirts and tailored trousers on a brass garment rail"
+          alt="Surulere fashion atelier showroom featuring olive linen blazers, ecru resortwear shirts and tailored trousers on a brass garment rail"
           width={1920}
           height={1080}
           fetchPriority="high"
@@ -116,10 +116,8 @@ export default function Quote() {
           <div className="quote-detail">
             <span className="detail-mark">⌖</span>
             <div>
-              <strong>Lagos, Nigeria · Local &amp; International Dispatch</strong>
-              <span>
-                Yaba Flagship Plant · Victoria Island Atelier · Ikeja Export Depot
-              </span>
+              <strong>Surulere, Lagos · Local &amp; International Dispatch</strong>
+              <span>1 Alawode Street, Surulere, Lagos, Nigeria</span>
             </div>
           </div>
 

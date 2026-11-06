@@ -36,9 +36,9 @@ export default function Process() {
               </h1>
 
               <p className="hero-fs-description">
-                Every Miss Kudi Productions order travels through five documented, quality-gated
-                stages — connecting our Pattern Studio, Cutting Tables, Sewing Lines, and AQL 2.5
-                Finishing Bay into one continuous manufacturing journey.
+                Every Miss Kudi Productions order at our Surulere facility travels through five
+                documented, quality-gated stages · connecting our Pattern Studio, Cutting Tables,
+                Sewing Lines, and AQL 2.5 Finishing Bay into one continuous manufacturing journey.
               </p>
 
               <div className="hero-fs-actions">

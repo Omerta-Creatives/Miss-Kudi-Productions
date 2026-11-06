@@ -127,7 +127,7 @@ export function ProductionJobTicketModal({
               style={{ width: 58, height: 58 }}
             />
             <div className="wordmark-sub" style={{ letterSpacing: "0.22em" }}>
-              B2B GARMENT MANUFACTURING · 1 ALAWODE STREET, LAGOS, NIGERIA
+              B2B GARMENT MANUFACTURING · 1 ALAWODE STREET, SURULERE, LAGOS, NIGERIA
             </div>
           </div>
           <div style={{ textAlign: "right" }}>

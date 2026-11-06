@@ -8,7 +8,7 @@ export default function Services() {
       <section className="marketing-stage-hero">
         <img
           src="/images/sewing-production-line.jpg"
-          alt="Nigerian master tailors operating industrial lockstitch sewing machines in the Miss Kudi Productions Lagos factory"
+          alt="Nigerian master tailors operating industrial lockstitch sewing machines in the Miss Kudi Productions Surulere, Lagos factory"
           width={1920}
           height={1080}
           fetchPriority="high"
@@ -220,7 +220,7 @@ export default function Services() {
             <h2>
               What we produce across
               <br />
-              <em>our Lagos lines.</em>
+              <em>our Surulere lines.</em>
             </h2>
           </div>
           <p>

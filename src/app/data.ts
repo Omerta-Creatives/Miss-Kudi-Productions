@@ -48,7 +48,7 @@ export const services: ServiceItem[] = [
     number: "03",
     title: "Pattern-led development & grading",
     subtitle: "CAD Pattern Drafting, Toiles & XS–XXL Size Grading",
-    copy: "Precision pattern engineering in our Victoria Island & Yaba studios. We translate sketches, physical reference garments or digital tech packs into production-ready graded blocks.",
+    copy: "Precision pattern engineering in our Surulere CAD Pattern Studio. We translate sketches, physical reference garments or digital tech packs into production-ready graded blocks.",
     moqLabel: "1st Fit Sample + Graded Run",
     leadTimeLabel: "7 – 14 Days Sample Lead",
     artisanRole: "Senior Pattern Designers & Cutting Masters",
@@ -111,7 +111,7 @@ export const processStages: ProcessStageDetail[] = [
     number: "02",
     stageCode: "STAGE 02 · PATTERN STUDIO & QUOTATION",
     title: "CAD pattern drafting & costing sign-off",
-    leadRole: "Senior Pattern Designer (VI & Yaba Studios)",
+    leadRole: "Senior Pattern Designer (Surulere Pattern Studio)",
     duration: "Day 3 – 7",
     copy: "Our Pattern Designers draft or validate your master block, grade across XS–XXL sizes, and compute exact marker efficiency so you never overpay for fabric yardage.",
     checkpoints: [
@@ -245,34 +245,34 @@ export interface FacilityHighlight {
 
 export const facilityHighlights: FacilityHighlight[] = [
   {
-    code: "PLANT 01 · YABA FLAGSHIP",
-    name: "Yaba Flagship Production Plant",
-    location: "1 Alawode Street, Lagos, Nigeria",
-    focus: "High-Volume Cut-and-Sew, Knitwear, Streetwear & Central AQL 2.5 QC Hub",
+    code: "DIVISION 01 · BULK SEWING FLOOR",
+    name: "Surulere Cut-and-Sew Production Floor",
+    location: "1 Alawode Street, Surulere, Lagos",
+    focus: "High-Volume Cut-and-Sew, Knitwear, Streetwear & Structured Tailoring Lines",
     machines: "48 Industrial Sewing & Cutting Stations",
     monthlyCapacity: "18,000+ Units / Month",
     image: "/images/sewing-production-line.jpg",
-    alt: "Yaba flagship production floor with Nigerian master tailors at industrial sewing stations",
+    alt: "Surulere production floor with Nigerian master tailors at industrial sewing stations",
   },
   {
-    code: "PLANT 02 · VICTORIA ISLAND ATELIER",
-    name: "Victoria Island Pattern & Sample Atelier",
-    location: "Adeola Odeku, Victoria Island, Lagos",
+    code: "DIVISION 02 · PATTERN & SAMPLE STUDIO",
+    name: "CAD Pattern, Grading & Sample Atelier",
+    location: "1 Alawode Street, Surulere, Lagos",
     focus: "CAD Pattern Drafting, First Fit Samples, Luxury Resortwear & Client Fittings",
     machines: "16 Precision Sample & Draping Stations",
-    monthlyCapacity: "3,500+ Luxury Units / Month",
+    monthlyCapacity: "3,500+ Sample & Capsule Units / Month",
     image: "/images/lagos-atelier-lookbook.jpg",
-    alt: "Victoria Island fashion atelier showroom with olive linen blazers and resortwear on brass rail",
+    alt: "Surulere fashion atelier showroom with olive linen blazers and resortwear on brass rail",
   },
   {
-    code: "PLANT 03 · IKEJA FINISHING DEPOT",
-    name: "Ikeja Workwear & Export Finishing Depot",
-    location: "Oba Akran Industrial Estate, Ikeja, Lagos",
-    focus: "Corporate Uniforms, Heavy Twill/Denim, Vacuum Steam Pressing & Export Cartons",
+    code: "DIVISION 03 · AQL 2.5 QC & FINISHING BAY",
+    name: "Quality Assurance & Export Finishing Bay",
+    location: "1 Alawode Street, Surulere, Lagos",
+    focus: "36-Point AQL 2.5 Inspection, Vacuum Steam Pressing, Private-Label Tagging & Dispatch",
     machines: "28 Heavy-Duty & Steam Finishing Stations",
-    monthlyCapacity: "14,000+ Units / Month",
+    monthlyCapacity: "14,000+ Export-Ready Units / Month",
     image: "/images/qc-finishing-bay.jpg",
-    alt: "Ikeja quality control and export finishing bay with dress form inspection and garment racks",
+    alt: "Surulere quality control and export finishing bay with dress form inspection and garment racks",
   },
 ];
 
@@ -290,7 +290,7 @@ export const productionFaqs: FaqItem[] = [
   {
     question: "Do I need a digital tech pack before requesting a quote?",
     answer:
-      "No. While an approved tech pack or graded pattern speeds up onboarding by 20%, our Victoria Island Pattern Studio can develop your CAD pattern and graded spec sheet from a physical reference sample, sketch, or detailed design brief.",
+      "No. While an approved tech pack or graded pattern speeds up onboarding by 20%, our Surulere Pattern Studio can develop your CAD pattern and graded spec sheet from a physical reference sample, sketch, or detailed design brief.",
   },
   {
     question: "Can I supply my own fabric (CMT), or do you source fabrics and trims (FOB)?",

@@ -17,7 +17,7 @@ export default function PrivacyPolicy() {
           <li>We do not share personal data with third parties without consent.</li>
           <li>You may request deletion of your data at any time.</li>
         </ul>
-        <p>For full details, contact us at <Link href="mailto:info@misskudi.com">info@misskudi.com</Link> or visit our office at 1 Alawode Street, Lagos, Nigeria.</p>
+        <p>For full details, contact us at <Link href="mailto:info@misskudi.com">info@misskudi.com</Link> or visit our office at 1 Alawode Street, Surulere, Lagos, Nigeria.</p>
       </section>
     </main>
   );
