@@ -1,9 +1,9 @@
 # Miss Kudi Productions — B2B Garment Manufacturing & Factory Operations OS
 
-End-to-end **B2B Apparel Manufacturing Atelier** and **Multi-Facility Factory Operations OS** built for **Miss Kudi Productions** across three Lagos, Nigeria production plants:
-- **MKP-LOS-01 — Yaba Flagship Production Plant** (Woven RTW, CAD pattern grading, bulk apparel assembly)
-- **MKP-LOS-02 — Victoria Island Bespoke & Bridal Atelier** (Couture sampling, capsule tailoring, luxury hand-finishing)
-- **MKP-LOS-03 — Ikeja Bulk Uniform & Industrial Depot** (High-volume corporate, hospitality, and export uniform runs)
+End-to-end **B2B Apparel Manufacturing Atelier** and **Factory Operations OS** built for **Miss Kudi Productions** at **1 Alawode Street, Surulere, Lagos, Nigeria**:
+- **Division 01 — Surulere Cut-and-Sew Production Floor** (High-volume cut-and-sew, knitwear, streetwear, and structured tailoring lines)
+- **Division 02 — CAD Pattern, Grading & Sample Atelier** (CAD pattern drafting, first-fit samples, luxury resortwear, and XS–XXL grading)
+- **Division 03 — Quality Assurance & Export Finishing Bay** (36-point AQL 2.5 inspection, vacuum steam pressing, private-label tagging, and dispatch)
 
 ---
 
@@ -53,7 +53,7 @@ End-to-end **B2B Apparel Manufacturing Atelier** and **Multi-Facility Factory Op
 
 ### 3. Design System, Motion & Mobile Responsiveness
 - **Design Specification ([`DESIGN.md`](DESIGN.md))**: Warm unbleached linen surfaces (`#f8f5f0`), deep olive ink (`#3d4f22`), editorial `Playfair Display` + `DM Sans` + tabular monospace numerals.
-- **Interactive CAD Weave Canvas & Choreographed Motion**: [`AtelierWeaveCanvas.tsx`](src/app/components/AtelierWeaveCanvas.tsx) renders a 60fps DPI-scaled HTML5 2D warp-and-weft textile simulation with pointer parallax and `prefers-reduced-motion` static fallback.
+- **Choreographed Motion & 3D Journey Slider**: [`AnimatedHero.tsx`](src/app/components/AnimatedHero.tsx) renders a 6-chapter fullscreen production journey with CSS Scroll-Driven Animations and `prefers-reduced-motion` support.
 - **Mobile & Container-Query Responsiveness**: Built with dynamic viewport units (`dvh` / `dvw`), `@container` responsive stacked data tables with sticky headers, `16px` mobile form inputs, and safe-area thumb-zone bottom navigation.
 
 ---
