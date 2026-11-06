@@ -13,8 +13,10 @@ export default function LoginPage() {
       fallback={
         <main className="auth-portal-main">
           <div className="container">
-            <div className="glass-panel" style={{ padding: "2rem" }}>
-              Loading Miss Kudi Operations Authentication...
+            <div className="auth-portal-shell">
+              <div className="glass-panel auth-desk-card">
+                Loading Sign-In...
+              </div>
             </div>
           </div>
         </main>

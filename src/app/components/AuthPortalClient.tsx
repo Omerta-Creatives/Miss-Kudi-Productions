@@ -4,7 +4,6 @@ import React, { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import AtelierWeaveCanvas from "./AtelierWeaveCanvas";
 import {
   ACCESS_TIER_LABELS,
   ArtisanStaff,
@@ -78,7 +77,7 @@ export default function AuthPortalClient({
 
   const [artisans, setArtisans] = useState<ArtisanStaff[]>(INITIAL_ARTISANS);
   const [sessionUser, setSessionUser] = useState<ArtisanStaff | null>(null);
-  const [sessionMeta, setSessionMeta] = useState<ClientSessionMeta | null>(null);
+  const [, setSessionMeta] = useState<ClientSessionMeta | null>(null);
 
   // Sign-In state
   const [email, setEmail] = useState("");
@@ -123,11 +122,9 @@ export default function AuthPortalClient({
     }
 
     if (signedOutParam) {
-      setStatusMessage("You have been signed out and your session was cleared.");
+      setStatusMessage("You have been signed out.");
     } else if (reasonParam === "auth_required" && redirectParam) {
-      setStatusMessage(
-        `Sign in with an authorized Admin, Superadmin, or Staff account to continue to ${redirectParam}.`
-      );
+      setStatusMessage(`Sign in to continue to ${redirectParam}.`);
     }
 
     // Fetch authoritative server session
@@ -175,20 +172,24 @@ export default function AuthPortalClient({
     const ac = new AbortController();
     otpAbortRef.current = ac;
 
-    (navigator.credentials as any)
+    (
+      navigator.credentials as CredentialsContainer & {
+        get: (options?: CredentialRequestOptions & Record<string, unknown>) => Promise<{ code?: string } | null>;
+      }
+    )
       .get({
         otp: { transport: ["sms"] },
         signal: ac.signal,
       })
-      .then((cred: { code?: string } | null) => {
+      .then((cred) => {
         if (!cred?.code) return;
         setOtpCode(cred.code);
         requestAnimationFrame(() => {
           otpFormRef.current?.requestSubmit();
         });
       })
-      .catch((err: any) => {
-        if (err?.name === "AbortError") return;
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
       });
 
     return () => {
@@ -196,7 +197,7 @@ export default function AuthPortalClient({
     };
   }, [mode, resetChallenge]);
 
-  // modern-web-guidance (validate-input-after-interaction)
+  // modern-web-guidance (forms): validate on blur, clear active errors on input
   const handleFieldBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const input = e.currentTarget;
     const state = dirtyControlsRef.current.get(input) || {
@@ -223,11 +224,15 @@ export default function AuthPortalClient({
     state.interacted = true;
     dirtyControlsRef.current.set(input, state);
 
-    if (state.blurred || input.getAttribute("aria-invalid") === "true") {
-      const valid = input.checkValidity();
-      input.classList.toggle("user-invalid-fallback", !valid);
-      input.classList.toggle("user-valid-fallback", valid);
-      input.setAttribute("aria-invalid", valid ? "false" : "true");
+    input.classList.remove("user-invalid-fallback");
+    if (input.getAttribute("aria-invalid") === "true") {
+      input.removeAttribute("aria-invalid");
+    }
+    if (state.blurred) {
+      input.classList.toggle(
+        "user-valid-fallback",
+        input.value.length > 0 && input.checkValidity()
+      );
     }
   };
 
@@ -310,9 +315,7 @@ export default function AuthPortalClient({
 
       const destination = resolveDestination(authenticatedUser);
       setStatusMessage(
-        `Signed in as ${authenticatedUser.name} (${
-          ACCESS_TIER_LABELS[authenticatedUser.accessTier]
-        }). Opening ${destination}...`
+        `Signed in as ${authenticatedUser.name}. Opening ${destination}...`
       );
 
       setTimeout(() => {
@@ -340,7 +343,7 @@ export default function AuthPortalClient({
 
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes("@")) {
-      setErrorMessage("Please enter your factory work email address.");
+      setErrorMessage("Please enter your work email address.");
       focusAlert();
       return;
     }
@@ -460,7 +463,7 @@ export default function AuthPortalClient({
 
       const destination = resolveDestination(updatedUser);
       setStatusMessage(
-        `Password updated for ${updatedUser.email}. Signed in and redirecting to ${destination}...`
+        `Password updated. Redirecting to ${destination}...`
       );
 
       setTimeout(() => {
@@ -529,9 +532,7 @@ export default function AuthPortalClient({
 
       setCurrentPassword("");
       setNextSelfPassword("");
-      setStatusMessage(
-        `Password updated for ${sessionUser.name} (${sessionUser.email}).`
-      );
+      setStatusMessage(`Password updated for ${sessionUser.email}.`);
     } catch {
       setErrorMessage("Failed to update password. Please try again.");
       focusAlert();
@@ -552,6 +553,7 @@ export default function AuthPortalClient({
       setSessionUser(null);
       setSessionMeta(null);
       setPassword("");
+      setMode("signin");
       setSubmitting(false);
       setStatusMessage("Signed out of Miss Kudi Operations.");
       router.refresh();
@@ -562,7 +564,7 @@ export default function AuthPortalClient({
     setRememberedEmail("", false);
     setHasRememberedEmail(false);
     setRememberMe(false);
-    setStatusMessage("Cleared remembered workstation email from this browser.");
+    setStatusMessage("Cleared saved email from this browser.");
   };
 
   const panelMotion = prefersReducedMotion
@@ -578,79 +580,49 @@ export default function AuthPortalClient({
     <main className="auth-portal-main">
       <div className="container">
         <div className="auth-portal-shell">
-          {/* Compact Top Identity Masthead */}
-          <header className="auth-portal-masthead">
-            <div className="auth-masthead-brand">
-              <img
-                src="/images/mk-logo-transparent.png"
-                alt="Miss Kudi Productions"
-                width={56}
-                height={56}
-                className="wordmark-logo-img"
-                style={{ width: 56, height: 56 }}
-              />
-              <div>
-                <div className="auth-masthead-kicker mono">
-                  INTERNAL STAFF &amp; ADMIN AUTHENTICATION · YABA · VI · IKEJA
-                </div>
-                <h1 className="auth-masthead-title">
-                  Factory Identity &amp;{" "}
-                  <span className="text-gold">Operations Access</span>
-                </h1>
+          {sessionUser && (
+            <div className="auth-active-banner">
+              <div className="auth-active-user">
+                <span>Signed in as</span>
+                <strong>{sessionUser.name}</strong>
+                <span
+                  className={`badge ${TIER_BADGE_CLASS[sessionUser.accessTier]}`}
+                >
+                  {ACCESS_TIER_LABELS[sessionUser.accessTier]}
+                </span>
+              </div>
+              <div className="auth-active-actions">
+                <Link
+                  href={
+                    sessionUser.accessTier === "superadmin"
+                      ? "/superadmin"
+                      : "/dashboard"
+                  }
+                  className="btn-primary auth-compact-btn"
+                >
+                  Open Console →
+                </Link>
+                <button
+                  type="button"
+                  className="btn-secondary auth-compact-btn"
+                  onClick={handleSignOut}
+                  disabled={submitting}
+                >
+                  Sign Out
+                </button>
               </div>
             </div>
+          )}
 
+          <section
+            className="glass-panel auth-desk-card"
+            aria-labelledby="auth-desk-heading"
+          >
             {sessionUser && (
-              <div className="auth-active-banner">
-                <div>
-                  <span className="mono auth-active-kicker">
-                    ACTIVE SESSION ·{" "}
-                    {sessionMeta?.rememberMe ? "30D REMEMBERED" : "8H SHIFT"}
-                  </span>
-                  <div className="auth-active-user">
-                    <strong>{sessionUser.name}</strong> ({sessionUser.email}){" "}
-                    <span
-                      className={`badge ${TIER_BADGE_CLASS[sessionUser.accessTier]}`}
-                    >
-                      {ACCESS_TIER_LABELS[sessionUser.accessTier]}
-                    </span>
-                  </div>
-                </div>
-                <div className="auth-active-actions">
-                  <Link
-                    href={
-                      sessionUser.accessTier === "superadmin"
-                        ? "/superadmin"
-                        : "/dashboard"
-                    }
-                    className="btn-primary auth-compact-btn"
-                  >
-                    Continue to Console →
-                  </Link>
-                  <button
-                    type="button"
-                    className="btn-secondary auth-compact-btn"
-                    onClick={handleSignOut}
-                    disabled={submitting}
-                  >
-                    Sign Out
-                  </button>
-                </div>
-              </div>
-            )}
-          </header>
-
-          <div className="auth-split-grid">
-            {/* LEFT COLUMN: Primary Credential & Recovery Desk */}
-            <section
-              className="glass-panel auth-desk-card"
-              aria-labelledby="auth-desk-heading"
-            >
-              {/* Mode Switcher Tabs */}
               <div
                 className="auth-mode-tabs"
                 role="tablist"
-                aria-label="Authentication and password management"
+                aria-label="Account actions"
               >
                 <button
                   type="button"
@@ -667,727 +639,580 @@ export default function AuthPortalClient({
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={
-                    mode === "reset-request" || mode === "reset-verify"
-                  }
+                  aria-selected={mode === "change-password"}
                   className={`auth-mode-tab ${
-                    mode === "reset-request" || mode === "reset-verify"
-                      ? "active"
-                      : ""
+                    mode === "change-password" ? "active" : ""
                   }`}
                   onClick={() => {
-                    setMode(resetChallenge ? "reset-verify" : "reset-request");
+                    setMode("change-password");
                     setErrorMessage(null);
                   }}
                 >
-                  Reset password
+                  Change password
                 </button>
-                {sessionUser && (
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === "change-password"}
-                    className={`auth-mode-tab ${
-                      mode === "change-password" ? "active" : ""
-                    }`}
-                    onClick={() => {
-                      setMode("change-password");
-                      setErrorMessage(null);
-                    }}
-                  >
-                    Change password
-                  </button>
-                )}
               </div>
+            )}
 
-              {/* Dynamic Error & Status Alerts */}
-              {errorMessage && (
-                <div
-                  ref={errorSummaryRef}
-                  role="alert"
-                  aria-live="assertive"
-                  tabIndex={-1}
-                  className="auth-alert auth-alert-error"
-                >
-                  <strong>⚠ Authentication check failed</strong>
-                  <span>{errorMessage}</span>
-                </div>
-              )}
+            {/* Dynamic Error & Status Alerts */}
+            {errorMessage && (
+              <div
+                ref={errorSummaryRef}
+                role="alert"
+                aria-live="assertive"
+                tabIndex={-1}
+                className="auth-alert auth-alert-error"
+              >
+                <strong>⚠ Sign-in check failed</strong>
+                <span>{errorMessage}</span>
+              </div>
+            )}
 
-              {statusMessage && (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className="auth-alert auth-alert-ok"
-                >
-                  <span>✓ {statusMessage}</span>
-                </div>
-              )}
+            {statusMessage && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="auth-alert auth-alert-ok"
+              >
+                <span>✓ {statusMessage}</span>
+              </div>
+            )}
 
-              <AnimatePresence mode="wait">
-                {/* ==================== VIEW 1: SIGN IN ==================== */}
-                {mode === "signin" && (
-                  <motion.div key="signin-view" {...panelMotion}>
-                    <div className="auth-desk-header">
-                      <h2 id="auth-desk-heading">Staff &amp; Admin Sign-In</h2>
-                      <p>
-                        Enter your authorized Miss Kudi work credentials for
-                        Superadmin HQ, Plant Admin, or Floor Station access.
-                      </p>
+            <AnimatePresence mode="wait">
+              {/* ==================== VIEW 1: SIGN IN ==================== */}
+              {mode === "signin" && (
+                <motion.div key="signin-view" {...panelMotion}>
+                  <div className="auth-desk-header">
+                    <h1 id="auth-desk-heading">Sign in</h1>
+                    <p>Enter your Miss Kudi work credentials to continue.</p>
+                  </div>
+
+                  <form
+                    action="/api/auth/login"
+                    method="POST"
+                    onSubmit={handleSignInSubmit}
+                    noValidate
+                  >
+                    <div className="auth-field">
+                      <label htmlFor="email" className="auth-label">
+                        Work email
+                      </label>
+                      <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        className="auth-input"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        onBlur={handleFieldBlur}
+                        onInput={handleFieldInput}
+                        autoComplete="username"
+                        spellCheck={false}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        enterKeyHint="next"
+                        placeholder="name@misskudi.com"
+                        aria-describedby="signin-email-error"
+                        required
+                      />
+                      <div
+                        id="signin-email-error"
+                        className="auth-field-error"
+                        aria-live="polite"
+                      >
+                        <span aria-hidden="true">✕</span> Enter a valid work
+                        email address.
+                      </div>
                     </div>
 
-                    <form
-                      action="/api/auth/login"
-                      method="POST"
-                      onSubmit={handleSignInSubmit}
-                      noValidate
-                    >
-                      <div className="auth-field">
-                        <label htmlFor="email" className="auth-label">
-                          Work email
-                        </label>
-                        <span id="signin-email-hint" className="auth-hint">
-                          Enter your provisioned Miss Kudi work email address.
-                        </span>
-                        <input
-                          type="email"
-                          id="email"
-                          name="email"
-                          className="auth-input"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          onBlur={handleFieldBlur}
-                          onInput={handleFieldInput}
-                          autoComplete="username"
-                          spellCheck={false}
-                          autoCapitalize="none"
-                          autoCorrect="off"
-                          enterKeyHint="next"
-                          placeholder="name@misskudi.com"
-                          aria-describedby="signin-email-hint"
-                          required
-                        />
-                        <div className="auth-field-error" aria-live="polite">
-                          <span aria-hidden="true">✕</span> Enter a valid work
-                          email address.
-                        </div>
-                      </div>
-
-                      <div className="auth-field">
-                        <div className="auth-label-row">
-                          <label
-                            htmlFor="current-password"
-                            className="auth-label"
-                          >
-                            Password
-                          </label>
-                          <div className="auth-password-tools">
-                            <button
-                              type="button"
-                              className="auth-link-btn"
-                              onClick={() => {
-                                setErrorMessage(null);
-                                setStatusMessage(null);
-                                setMode("reset-request");
-                              }}
-                            >
-                              Forgot password?
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword((prev) => !prev)}
-                              aria-label={
-                                showPassword ? "Hide password" : "Show password"
-                              }
-                              aria-pressed={showPassword}
-                              aria-describedby={toggleWarnId}
-                              className="auth-show-toggle"
-                            >
-                              {showPassword ? "Hide" : "Show"}
-                            </button>
-                            <span id={toggleWarnId} className="visually-hidden">
-                              Warning: this will display your password on the
-                              screen.
-                            </span>
-                          </div>
-                        </div>
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          id="current-password"
-                          name="password"
-                          className="auth-input"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          onBlur={handleFieldBlur}
-                          onInput={handleFieldInput}
-                          autoComplete="current-password"
-                          enterKeyHint="done"
-                          placeholder="Enter your password"
-                          required
-                        />
-                        <div className="auth-field-error" aria-live="polite">
-                          <span aria-hidden="true">✕</span> Password is required
-                          to sign in.
-                        </div>
-                      </div>
-
-                      {/* Remember Me & Workstation Persistence */}
-                      <div className="auth-remember-box">
+                    <div className="auth-field">
+                      <div className="auth-label-row">
                         <label
-                          htmlFor="remember-me"
-                          className="auth-remember-label"
+                          htmlFor="current-password"
+                          className="auth-label"
                         >
-                          <input
-                            type="checkbox"
-                            id="remember-me"
-                            name="rememberMe"
-                            checked={rememberMe}
-                            onChange={(e) => setRememberMe(e.target.checked)}
-                          />
-                          <div>
-                            <span className="auth-remember-title">
-                              Remember me on this workstation for 30 days
-                            </span>
-                            <span className="auth-remember-desc">
-                              {rememberMe
-                                ? "Saves your work email and issues a 30-day persistent HttpOnly cookie. Uncheck on shared sewing or QC tablets."
-                                : "Shared floor terminal mode: 8-hour shift session clears automatically when the browser closes."}
-                            </span>
-                          </div>
+                          Password
                         </label>
-                        {hasRememberedEmail && (
-                          <button
-                            type="button"
-                            className="auth-forget-email-btn"
-                            onClick={handleForgetRememberedEmail}
-                          >
-                            Clear saved email
-                          </button>
-                        )}
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="btn-primary auth-submit-btn"
-                        disabled={submitting}
-                      >
-                        {submitting
-                          ? "Verifying credentials..."
-                          : "Sign in to Operations Console"}
-                      </button>
-
-                      <div className="auth-secondary-links">
-                        <span>Need a standalone recovery link?</span>
-                        <Link
-                          href={`/reset-password${
-                            email.trim()
-                              ? `?email=${encodeURIComponent(email.trim())}`
-                              : ""
-                          }`}
-                          className="auth-inline-anchor"
-                        >
-                          Open /reset-password →
-                        </Link>
-                      </div>
-                    </form>
-                  </motion.div>
-                )}
-
-                {/* ==================== VIEW 2A: REQUEST PASSWORD RESET ==================== */}
-                {mode === "reset-request" && (
-                  <motion.div key="reset-request-view" {...panelMotion}>
-                    <div className="auth-desk-header">
-                      <span className="mono auth-step-pill">
-                        STEP 1 OF 2 · REQUEST VERIFICATION CODE
-                      </span>
-                      <h2 id="auth-desk-heading">Reset your factory password</h2>
-                      <p>
-                        Enter your provisioned Admin, Superadmin, or Floor Staff
-                        email to receive a 6-digit one-time verification code
-                        valid for 15 minutes.
-                      </p>
-                    </div>
-
-                    <form
-                      action="/api/auth/forgot-password"
-                      method="POST"
-                      onSubmit={handleRequestResetSubmit}
-                      noValidate
-                    >
-                      <div className="auth-field">
-                        <label htmlFor="reset-email" className="auth-label">
-                          Work email address
-                        </label>
-                        <span id="reset-email-hint" className="auth-hint">
-                          Works for initial password setup on newly onboarded
-                          staff accounts and locked accounts.
-                        </span>
-                        <input
-                          type="email"
-                          id="reset-email"
-                          name="email"
-                          className="auth-input"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          onBlur={handleFieldBlur}
-                          onInput={handleFieldInput}
-                          autoComplete="username"
-                          spellCheck={false}
-                          autoCapitalize="none"
-                          autoCorrect="off"
-                          enterKeyHint="done"
-                          placeholder="name@misskudi.com"
-                          aria-describedby="reset-email-hint"
-                          required
-                        />
-                        <div className="auth-field-error" aria-live="polite">
-                          <span aria-hidden="true">✕</span> Enter a valid work
-                          email address.
-                        </div>
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="btn-primary auth-submit-btn"
-                        disabled={submitting}
-                      >
-                        {submitting
-                          ? "Generating 6-digit code..."
-                          : "Send 6-digit verification code"}
-                      </button>
-
-                      <div className="auth-secondary-links">
                         <button
                           type="button"
-                          className="auth-link-btn"
-                          onClick={() => {
-                            setErrorMessage(null);
-                            setMode("signin");
-                          }}
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          aria-label={
+                            showPassword ? "Hide password" : "Show password"
+                          }
+                          aria-pressed={showPassword}
+                          aria-describedby={toggleWarnId}
+                          className="auth-show-toggle"
                         >
-                          ← Back to Sign in
+                          {showPassword ? "Hide" : "Show"}
                         </button>
+                        <span id={toggleWarnId} className="visually-hidden">
+                          Warning: this will display your password on the
+                          screen.
+                        </span>
                       </div>
-                    </form>
-                  </motion.div>
-                )}
-
-                {/* ==================== VIEW 2B: VERIFY OTP & SET NEW PASSWORD ==================== */}
-                {mode === "reset-verify" && (
-                  <motion.div key="reset-verify-view" {...panelMotion}>
-                    <div className="auth-desk-header">
-                      <span className="mono auth-step-pill">
-                        STEP 2 OF 2 · VERIFY CODE &amp; SET NEW PASSWORD
-                      </span>
-                      <h2 id="auth-desk-heading">
-                        Enter 6-digit code &amp; new password
-                      </h2>
-                      <p>
-                        Verifying recovery for <strong>{email}</strong>.
-                      </p>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        id="current-password"
+                        name="password"
+                        className="auth-input"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        onBlur={handleFieldBlur}
+                        onInput={handleFieldInput}
+                        autoComplete="current-password"
+                        enterKeyHint="done"
+                        placeholder="Enter your password"
+                        aria-describedby="signin-password-error"
+                        required
+                      />
+                      <div
+                        id="signin-password-error"
+                        className="auth-field-error"
+                        aria-live="polite"
+                      >
+                        <span aria-hidden="true">✕</span> Password is required
+                        to sign in.
+                      </div>
                     </div>
 
-                    {dispatchPreview && (
-                      <div className="auth-dispatch-preview">
-                        <div className="auth-dispatch-top">
-                          <span className="mono">
-                            ATELIER DISPATCH PREVIEW · 15M TTL
-                          </span>
-                          <button
-                            type="button"
-                            className="auth-autofill-otp-btn"
-                            onClick={() => setOtpCode(dispatchPreview.otpCode)}
-                          >
-                            Fill code {dispatchPreview.otpCode}
-                          </button>
-                        </div>
-                        <pre className="mono auth-dispatch-sms">
-                          {dispatchPreview.originBoundSmsSample}
-                        </pre>
+                    <div className="auth-options-row">
+                      <label
+                        htmlFor="remember-me"
+                        className="auth-remember-inline"
+                      >
+                        <input
+                          type="checkbox"
+                          id="remember-me"
+                          name="rememberMe"
+                          checked={rememberMe}
+                          onChange={(e) => setRememberMe(e.target.checked)}
+                        />
+                        <span>Keep me signed in for 30 days</span>
+                      </label>
+
+                      <button
+                        type="button"
+                        className="auth-link-btn"
+                        onClick={() => {
+                          setErrorMessage(null);
+                          setStatusMessage(null);
+                          setMode("reset-request");
+                        }}
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+
+                    {hasRememberedEmail && (
+                      <div className="auth-saved-email-row">
+                        <button
+                          type="button"
+                          className="auth-forget-email-btn"
+                          onClick={handleForgetRememberedEmail}
+                        >
+                          Clear saved email
+                        </button>
                       </div>
                     )}
 
-                    <form
-                      ref={otpFormRef}
-                      action="/api/auth/reset-password"
-                      method="POST"
-                      onSubmit={handleCompleteResetSubmit}
-                      noValidate
+                    <button
+                      type="submit"
+                      className="btn-primary auth-submit-btn"
+                      disabled={submitting}
                     >
+                      {submitting ? "Signing in..." : "Sign in"}
+                    </button>
+                  </form>
+                </motion.div>
+              )}
+
+              {/* ==================== VIEW 2A: REQUEST PASSWORD RESET ==================== */}
+              {mode === "reset-request" && (
+                <motion.div key="reset-request-view" {...panelMotion}>
+                  <div className="auth-desk-header">
+                    <h1 id="auth-desk-heading">Reset password</h1>
+                    <p>
+                      Enter your work email to receive a 6-digit verification
+                      code.
+                    </p>
+                  </div>
+
+                  <form
+                    action="/api/auth/forgot-password"
+                    method="POST"
+                    onSubmit={handleRequestResetSubmit}
+                    noValidate
+                  >
+                    <div className="auth-field">
+                      <label htmlFor="reset-email" className="auth-label">
+                        Work email
+                      </label>
                       <input
                         type="email"
-                        name="username"
+                        id="reset-email"
+                        name="email"
+                        className="auth-input"
                         value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        onBlur={handleFieldBlur}
+                        onInput={handleFieldInput}
                         autoComplete="username"
-                        readOnly
-                        tabIndex={-1}
-                        className="visually-hidden"
+                        spellCheck={false}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        enterKeyHint="done"
+                        placeholder="name@misskudi.com"
+                        aria-describedby="reset-email-error"
+                        required
                       />
-
-                      <div className="auth-field">
-                        <label htmlFor="otp-input" className="auth-label">
-                          6-digit verification code
-                        </label>
-                        <p id="otp-format-hint" className="auth-hint">
-                          Enter the 6-digit code sent to your work dispatch
-                          (single input supports paste and automatic OTP
-                          autofill).
-                        </p>
-                        <input
-                          ref={otpInputRef}
-                          type="text"
-                          id="otp-input"
-                          name="otp"
-                          className="auth-input auth-otp-input mono"
-                          value={otpCode}
-                          onChange={(e) =>
-                            setOtpCode(
-                              e.target.value.replace(/\D/g, "").slice(0, 6)
-                            )
-                          }
-                          onBlur={handleFieldBlur}
-                          onInput={handleFieldInput}
-                          inputMode="numeric"
-                          autoComplete="one-time-code"
-                          autoCorrect="off"
-                          autoCapitalize="off"
-                          spellCheck={false}
-                          pattern="\d{6}"
-                          maxLength={6}
-                          enterKeyHint="next"
-                          aria-describedby="otp-format-hint"
-                          placeholder="000000"
-                          required
-                        />
-                        <div className="auth-field-error" aria-live="polite">
-                          <span aria-hidden="true">✕</span> Enter all 6 numeric
-                          digits.
-                        </div>
-                      </div>
-
-                      <div className="auth-field">
-                        <div className="auth-label-row">
-                          <label htmlFor="new-password" className="auth-label">
-                            New password
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => setShowNewPassword((prev) => !prev)}
-                            aria-label={
-                              showNewPassword
-                                ? "Hide new password"
-                                : "Show new password"
-                            }
-                            aria-pressed={showNewPassword}
-                            aria-describedby={resetToggleWarnId}
-                            className="auth-show-toggle"
-                          >
-                            {showNewPassword ? "Hide" : "Show"}
-                          </button>
-                          <span
-                            id={resetToggleWarnId}
-                            className="visually-hidden"
-                          >
-                            Warning: this will display your new password on the
-                            screen.
-                          </span>
-                        </div>
-                        <ul id="password-rules" className="auth-rules-list">
-                          <li>At least 8 characters</li>
-                          <li>Includes at least one letter and one number</li>
-                        </ul>
-                        <input
-                          type={showNewPassword ? "text" : "password"}
-                          id="new-password"
-                          name="new-password"
-                          className="auth-input"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          onBlur={handleFieldBlur}
-                          onInput={handleFieldInput}
-                          autoComplete="new-password"
-                          pattern="(?=.*[A-Za-z])(?=.*\d).{8,}"
-                          minLength={8}
-                          enterKeyHint="done"
-                          aria-describedby="password-rules"
-                          placeholder="Create a strong password"
-                          required
-                        />
-                        <div className="auth-field-error" aria-live="polite">
-                          <span aria-hidden="true">✕</span> Use 8+ characters
-                          with at least one letter and one number.
-                        </div>
-                      </div>
-
-                      <div className="auth-remember-box">
-                        <label
-                          htmlFor="reset-remember-me"
-                          className="auth-remember-label"
-                        >
-                          <input
-                            type="checkbox"
-                            id="reset-remember-me"
-                            name="rememberMe"
-                            checked={rememberMe}
-                            onChange={(e) => setRememberMe(e.target.checked)}
-                          />
-                          <div>
-                            <span className="auth-remember-title">
-                              Keep me signed in for 30 days after reset
-                            </span>
-                            <span className="auth-remember-desc">
-                              Prior active sessions on other devices are
-                              automatically revoked.
-                            </span>
-                          </div>
-                        </label>
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="btn-primary auth-submit-btn"
-                        disabled={submitting}
+                      <div
+                        id="reset-email-error"
+                        className="auth-field-error"
+                        aria-live="polite"
                       >
-                        {submitting
-                          ? "Updating password & signing in..."
-                          : "Save new password & Sign in"}
-                      </button>
-
-                      <div className="auth-secondary-links">
-                        <button
-                          type="button"
-                          className="auth-link-btn"
-                          onClick={() => {
-                            stopWebOtpListener();
-                            setMode("reset-request");
-                          }}
-                        >
-                          Resend or change email
-                        </button>
-                        <button
-                          type="button"
-                          className="auth-link-btn"
-                          onClick={() => {
-                            stopWebOtpListener();
-                            setMode("signin");
-                          }}
-                        >
-                          Back to Sign in
-                        </button>
+                        <span aria-hidden="true">✕</span> Enter a valid work
+                        email address.
                       </div>
-                    </form>
-                  </motion.div>
-                )}
-
-                {/* ==================== VIEW 3: AUTHENTICATED CHANGE PASSWORD ==================== */}
-                {mode === "change-password" && sessionUser && (
-                  <motion.div key="change-password-view" {...panelMotion}>
-                    <div className="auth-desk-header">
-                      <span className="mono auth-step-pill">
-                        ACTIVE OPERATOR SECURITY
-                      </span>
-                      <h2 id="auth-desk-heading">Change your password</h2>
-                      <p>
-                        Updating credentials for{" "}
-                        <strong>{sessionUser.name}</strong> ({sessionUser.email}
-                        ).
-                      </p>
                     </div>
 
-                    <form
-                      action="/api/auth/change-password"
-                      method="POST"
-                      onSubmit={handleChangePasswordSubmit}
-                      noValidate
+                    <button
+                      type="submit"
+                      className="btn-primary auth-submit-btn"
+                      disabled={submitting}
                     >
-                      <input
-                        type="email"
-                        name="username"
-                        value={sessionUser.email}
-                        autoComplete="username"
-                        readOnly
-                        tabIndex={-1}
-                        className="visually-hidden"
-                      />
+                      {submitting
+                        ? "Sending code..."
+                        : "Send verification code"}
+                    </button>
 
-                      <div className="auth-field">
+                    <div className="auth-secondary-links">
+                      <button
+                        type="button"
+                        className="auth-link-btn"
+                        onClick={() => {
+                          setErrorMessage(null);
+                          setMode("signin");
+                        }}
+                      >
+                        ← Back to sign in
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              )}
+
+              {/* ==================== VIEW 2B: VERIFY OTP & SET NEW PASSWORD ==================== */}
+              {mode === "reset-verify" && (
+                <motion.div key="reset-verify-view" {...panelMotion}>
+                  <div className="auth-desk-header">
+                    <h1 id="auth-desk-heading">Verify recovery code</h1>
+                    <p>
+                      Enter the 6-digit code sent to <strong>{email}</strong>{" "}
+                      and choose a new password.
+                    </p>
+                  </div>
+
+                  {dispatchPreview && (
+                    <div className="auth-dispatch-preview">
+                      <div className="auth-dispatch-top">
+                        <span className="mono">VERIFICATION PREVIEW</span>
+                        <button
+                          type="button"
+                          className="auth-autofill-otp-btn"
+                          onClick={() => setOtpCode(dispatchPreview.otpCode)}
+                        >
+                          Fill code {dispatchPreview.otpCode}
+                        </button>
+                      </div>
+                      <pre className="mono auth-dispatch-sms">
+                        {dispatchPreview.originBoundSmsSample}
+                      </pre>
+                    </div>
+                  )}
+
+                  <form
+                    ref={otpFormRef}
+                    action="/api/auth/reset-password"
+                    method="POST"
+                    onSubmit={handleCompleteResetSubmit}
+                    noValidate
+                  >
+                    <input
+                      type="email"
+                      name="username"
+                      value={email}
+                      autoComplete="username"
+                      readOnly
+                      tabIndex={-1}
+                      className="visually-hidden"
+                    />
+
+                    <div className="auth-field">
+                      <label htmlFor="otp-input" className="auth-label">
+                        6-digit verification code
+                      </label>
+                      <input
+                        ref={otpInputRef}
+                        type="text"
+                        id="otp-input"
+                        name="otp"
+                        className="auth-input auth-otp-input mono"
+                        value={otpCode}
+                        onChange={(e) =>
+                          setOtpCode(
+                            e.target.value.replace(/\D/g, "").slice(0, 6)
+                          )
+                        }
+                        onBlur={handleFieldBlur}
+                        onInput={handleFieldInput}
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck={false}
+                        pattern="\d{6}"
+                        maxLength={6}
+                        enterKeyHint="next"
+                        aria-describedby="otp-field-error"
+                        placeholder="000000"
+                        required
+                      />
+                      <div
+                        id="otp-field-error"
+                        className="auth-field-error"
+                        aria-live="polite"
+                      >
+                        <span aria-hidden="true">✕</span> Enter all 6 numeric
+                        digits.
+                      </div>
+                    </div>
+
+                    <div className="auth-field">
+                      <div className="auth-label-row">
+                        <label htmlFor="new-password" className="auth-label">
+                          New password
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword((prev) => !prev)}
+                          aria-label={
+                            showNewPassword
+                              ? "Hide new password"
+                              : "Show new password"
+                          }
+                          aria-pressed={showNewPassword}
+                          aria-describedby={resetToggleWarnId}
+                          className="auth-show-toggle"
+                        >
+                          {showNewPassword ? "Hide" : "Show"}
+                        </button>
+                        <span
+                          id={resetToggleWarnId}
+                          className="visually-hidden"
+                        >
+                          Warning: this will display your new password on the
+                          screen.
+                        </span>
+                      </div>
+                      <span id="password-rules" className="auth-hint">
+                        At least 8 characters, including a letter and a number.
+                      </span>
+                      <input
+                        type={showNewPassword ? "text" : "password"}
+                        id="new-password"
+                        name="new-password"
+                        className="auth-input"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        onBlur={handleFieldBlur}
+                        onInput={handleFieldInput}
+                        autoComplete="new-password"
+                        pattern="(?=.*[A-Za-z])(?=.*\d).{8,}"
+                        minLength={8}
+                        enterKeyHint="done"
+                        aria-describedby="password-rules reset-password-error"
+                        placeholder="Create a strong password"
+                        required
+                      />
+                      <div
+                        id="reset-password-error"
+                        className="auth-field-error"
+                        aria-live="polite"
+                      >
+                        <span aria-hidden="true">✕</span> Use 8+ characters with
+                        at least one letter and one number.
+                      </div>
+                    </div>
+
+                    <div className="auth-options-row">
+                      <label
+                        htmlFor="reset-remember-me"
+                        className="auth-remember-inline"
+                      >
+                        <input
+                          type="checkbox"
+                          id="reset-remember-me"
+                          name="rememberMe"
+                          checked={rememberMe}
+                          onChange={(e) => setRememberMe(e.target.checked)}
+                        />
+                        <span>Keep me signed in for 30 days</span>
+                      </label>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="btn-primary auth-submit-btn"
+                      disabled={submitting}
+                    >
+                      {submitting
+                        ? "Updating password..."
+                        : "Save password & sign in"}
+                    </button>
+
+                    <div className="auth-secondary-links">
+                      <button
+                        type="button"
+                        className="auth-link-btn"
+                        onClick={() => {
+                          stopWebOtpListener();
+                          setMode("reset-request");
+                        }}
+                      >
+                        Resend code
+                      </button>
+                      <button
+                        type="button"
+                        className="auth-link-btn"
+                        onClick={() => {
+                          stopWebOtpListener();
+                          setMode("signin");
+                        }}
+                      >
+                        ← Back to sign in
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              )}
+
+              {/* ==================== VIEW 3: AUTHENTICATED CHANGE PASSWORD ==================== */}
+              {mode === "change-password" && sessionUser && (
+                <motion.div key="change-password-view" {...panelMotion}>
+                  <div className="auth-desk-header">
+                    <h1 id="auth-desk-heading">Change password</h1>
+                    <p>
+                      Update the password for{" "}
+                      <strong>{sessionUser.email}</strong>.
+                    </p>
+                  </div>
+
+                  <form
+                    action="/api/auth/change-password"
+                    method="POST"
+                    onSubmit={handleChangePasswordSubmit}
+                    noValidate
+                  >
+                    <input
+                      type="email"
+                      name="username"
+                      value={sessionUser.email}
+                      autoComplete="username"
+                      readOnly
+                      tabIndex={-1}
+                      className="visually-hidden"
+                    />
+
+                    <div className="auth-field">
+                      <label
+                        htmlFor="self-current-password"
+                        className="auth-label"
+                      >
+                        Current password
+                      </label>
+                      <input
+                        type={showSelfPassword ? "text" : "password"}
+                        id="self-current-password"
+                        name="currentPassword"
+                        className="auth-input"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        autoComplete="current-password"
+                        enterKeyHint="next"
+                        required
+                      />
+                    </div>
+
+                    <div className="auth-field">
+                      <div className="auth-label-row">
                         <label
-                          htmlFor="self-current-password"
+                          htmlFor="self-new-password"
                           className="auth-label"
                         >
-                          Current password
+                          New password
                         </label>
-                        <input
-                          type={showSelfPassword ? "text" : "password"}
-                          id="self-current-password"
-                          name="currentPassword"
-                          className="auth-input"
-                          value={currentPassword}
-                          onChange={(e) => setCurrentPassword(e.target.value)}
-                          autoComplete="current-password"
-                          enterKeyHint="next"
-                          required
-                        />
-                      </div>
-
-                      <div className="auth-field">
-                        <div className="auth-label-row">
-                          <label
-                            htmlFor="self-new-password"
-                            className="auth-label"
-                          >
-                            New password
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => setShowSelfPassword((prev) => !prev)}
-                            aria-label={
-                              showSelfPassword
-                                ? "Hide passwords"
-                                : "Show passwords"
-                            }
-                            aria-pressed={showSelfPassword}
-                            aria-describedby={changeToggleWarnId}
-                            className="auth-show-toggle"
-                          >
-                            {showSelfPassword ? "Hide" : "Show"}
-                          </button>
-                          <span
-                            id={changeToggleWarnId}
-                            className="visually-hidden"
-                          >
-                            Warning: this will display your passwords on the
-                            screen.
-                          </span>
-                        </div>
-                        <ul
-                          id="self-password-rules"
-                          className="auth-rules-list"
+                        <button
+                          type="button"
+                          onClick={() => setShowSelfPassword((prev) => !prev)}
+                          aria-label={
+                            showSelfPassword
+                              ? "Hide passwords"
+                              : "Show passwords"
+                          }
+                          aria-pressed={showSelfPassword}
+                          aria-describedby={changeToggleWarnId}
+                          className="auth-show-toggle"
                         >
-                          <li>At least 8 characters</li>
-                          <li>Includes at least one letter and one number</li>
-                        </ul>
-                        <input
-                          type={showSelfPassword ? "text" : "password"}
-                          id="self-new-password"
-                          name="newPassword"
-                          className="auth-input"
-                          value={nextSelfPassword}
-                          onChange={(e) => setNextSelfPassword(e.target.value)}
-                          onBlur={handleFieldBlur}
-                          onInput={handleFieldInput}
-                          autoComplete="new-password"
-                          pattern="(?=.*[A-Za-z])(?=.*\d).{8,}"
-                          minLength={8}
-                          enterKeyHint="done"
-                          aria-describedby="self-password-rules"
-                          required
-                        />
-                        <div className="auth-field-error" aria-live="polite">
-                          <span aria-hidden="true">✕</span> Use 8+ characters
-                          with at least one letter and one number.
-                        </div>
+                          {showSelfPassword ? "Hide" : "Show"}
+                        </button>
+                        <span
+                          id={changeToggleWarnId}
+                          className="visually-hidden"
+                        >
+                          Warning: this will display your passwords on the
+                          screen.
+                        </span>
                       </div>
-
-                      <button
-                        type="submit"
-                        className="btn-primary auth-submit-btn"
-                        disabled={submitting}
+                      <span id="self-password-rules" className="auth-hint">
+                        At least 8 characters, including a letter and a number.
+                      </span>
+                      <input
+                        type={showSelfPassword ? "text" : "password"}
+                        id="self-new-password"
+                        name="newPassword"
+                        className="auth-input"
+                        value={nextSelfPassword}
+                        onChange={(e) => setNextSelfPassword(e.target.value)}
+                        onBlur={handleFieldBlur}
+                        onInput={handleFieldInput}
+                        autoComplete="new-password"
+                        pattern="(?=.*[A-Za-z])(?=.*\d).{8,}"
+                        minLength={8}
+                        enterKeyHint="done"
+                        aria-describedby="self-password-rules self-password-error"
+                        required
+                      />
+                      <div
+                        id="self-password-error"
+                        className="auth-field-error"
+                        aria-live="polite"
                       >
-                        {submitting
-                          ? "Updating password..."
-                          : "Update password"}
-                      </button>
-                    </form>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </section>
-
-            {/* RIGHT COLUMN: Atelier Weave Canvas + Operations Access & Security Policy */}
-            <aside
-              aria-labelledby="operations-access-heading"
-              className="auth-ledger-column"
-            >
-              <AtelierWeaveCanvas
-                mode={mode}
-                authenticatedTier={sessionUser?.accessTier || null}
-                rememberMe={rememberMe}
-              />
-
-              <div className="glass-panel auth-directory-ledger">
-                <div className="auth-directory-head">
-                  <div>
-                    <span className="mono auth-ledger-kicker">
-                      WORKSTATION SECURITY &amp; ACCESS POLICY
-                    </span>
-                    <h2 id="operations-access-heading">
-                      Role-Scoped Factory Consoles
-                    </h2>
-                  </div>
-                </div>
-
-                <div className="auth-tier-group">
-                  <div className="auth-tier-heading mono">
-                    <span>01 / ACCESS TIERS</span>
-                    <span>YABA · VI · IKEJA</span>
-                  </div>
-                  <div className="auth-ledger-rows">
-                    <div className="auth-ledger-row">
-                      <div>
-                        <div className="auth-ledger-name">
-                          Executive HQ{" "}
-                          <span className="badge badge-gold">SUPERADMIN</span>
-                        </div>
-                        <div className="auth-ledger-meta">
-                          Multi-plant governance, facility capacity, team
-                          provisioning, and audit logs.
-                        </div>
+                        <span aria-hidden="true">✕</span> Use 8+ characters with
+                        at least one letter and one number.
                       </div>
                     </div>
-                    <div className="auth-ledger-row">
-                      <div>
-                        <div className="auth-ledger-name">
-                          Plant Operations{" "}
-                          <span className="badge badge-blue">ADMIN</span>
-                        </div>
-                        <div className="auth-ledger-meta">
-                          Branch production orders, team scheduling, and fabric
-                          runway inventory.
-                        </div>
-                      </div>
-                    </div>
-                    <div className="auth-ledger-row">
-                      <div>
-                        <div className="auth-ledger-name">
-                          Artisan Floor{" "}
-                          <span className="badge badge-green">STAFF</span>
-                        </div>
-                        <div className="auth-ledger-meta">
-                          Pattern grading, cutting lays, sewing batches, and AQL
-                          2.5 QC station sign-offs.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="auth-tier-group" style={{ marginBottom: 0 }}>
-                  <div className="auth-tier-heading mono">
-                    <span>02 / SESSION &amp; RATE PROTECTION</span>
-                    <span>HTTPONLY · PBKDF2</span>
-                  </div>
-                  <div className="auth-empty-staff">
-                    Sessions use signed <strong>HttpOnly</strong> cookies (8h
-                    floor shift or 30d workstation) with sliding-window API rate
-                    limits and brute-force lockout protection. Sign out anytime
-                    from the top bar or console sidebar when leaving a shared
-                    terminal.
-                  </div>
-                </div>
-              </div>
-            </aside>
-          </div>
+                    <button
+                      type="submit"
+                      className="btn-primary auth-submit-btn"
+                      disabled={submitting}
+                    >
+                      {submitting ? "Updating password..." : "Update password"}
+                    </button>
+                  </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </section>
         </div>
       </div>
     </main>
