@@ -1,11 +1,62 @@
-node_modules
-.next
-out
-.env*
-!.env.example
-.vercel
-.DS_Store
-._*
+# Dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# Next.js & TypeScript build outputs
+/.next/
+/out/
+/build/
+/dist/
+next-env.d.ts
 *.tsbuildinfo
-.agent
-.claude
+
+# Testing & coverage artifacts
+/coverage/
+/playwright-report/
+/test-results/
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+
+# macOS, exFAT AppleDouble & OS metadata
+.DS_Store
+**/.DS_Store
+._*
+**/._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+.TemporaryItems
+.fseventsd
+Thumbs.db
+
+# Deployment & tooling caches
+.vercel
+.turbo
+.eslintcache
+
+# Editor, scratch & agent directories
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+*.tmp
+*.bak
+/tmp/
+/temp/
+.agent/
+.claude/
+.gemini/
