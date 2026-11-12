@@ -117,7 +117,7 @@ export function ConsoleSidebar({
               </span>
             </div>
 
-            {!isStaff && branches && branches.length > 0 && onBranchChange ? (
+            {!isStaff && branches && branches.length > 1 && onBranchChange ? (
               <label className="sidebar-facility-picker">
                 <span>Active plant</span>
                 <select
@@ -133,6 +133,10 @@ export function ConsoleSidebar({
                   ))}
                 </select>
               </label>
+            ) : !isStaff ? (
+              <div className="sidebar-station-caption">
+                Facility: <strong>1 Alawode St, Surulere</strong>
+              </div>
             ) : (
               <div className="sidebar-station-caption">
                 Station: <strong>{user.station}</strong>

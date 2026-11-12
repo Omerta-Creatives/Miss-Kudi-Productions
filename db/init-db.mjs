@@ -54,18 +54,51 @@ async function main() {
   await runQuery(
     `INSERT INTO factory_branches (id, name, location, specialization, machine_count, staff_count, fabric_meters_stock, net_revenue_ngn, operating_expenses_ngn, true_net_profit_ngn, status)
      VALUES
-       ('BR-LOS-YABA', 'Yaba Flagship Production Plant', '1 Alawode Street, Lagos, Nigeria', 'Woven Tops, Streetwear & Bulk Cut-and-Sew', 48, 2, 0, 0, 0, 0, 'ACTIVE'),
-       ('BR-LOS-VI', 'Victoria Island Bespoke & Bridal Atelier', 'Adeola Odeku, Victoria Island, Lagos', 'Couture Draping, Silk & Luxury Eveningwear', 22, 0, 0, 0, 0, 0, 'ACTIVE'),
-       ('BR-LOS-IKEJA', 'Ikeja Bulk Uniform & Industrial Depot', 'Oba Akran Industrial Estate, Ikeja', 'Corporate Uniforms, Workwear & Heavy Denim', 64, 0, 0, 0, 0, 0, 'ACTIVE')
-     ON CONFLICT (id) DO UPDATE SET location = EXCLUDED.location`
+       ('br-surulere', 'Surulere Production Plant', '1 Alawode Street, Surulere, Lagos, Nigeria', 'CAD Pattern Studio, Bulk Cut-and-Sew Lines & AQL 2.5 Export Finishing', 92, 2, 0, 0, 0, 0, 'ACTIVE')
+     ON CONFLICT (id) DO UPDATE SET
+       name = EXCLUDED.name,
+       location = EXCLUDED.location,
+       specialization = EXCLUDED.specialization,
+       machine_count = EXCLUDED.machine_count`
+  );
+
+  await runQuery(
+    `UPDATE staff_users
+     SET branch_id = 'br-surulere',
+         branch_name = 'Surulere Production Plant'
+     WHERE branch_id IS NULL
+        OR branch_id IN ('BR-LOS-YABA', 'BR-LOS-VI', 'BR-LOS-IKEJA', 'br-yaba', 'br-vi', 'br-ikeja')
+        OR branch_name ILIKE '%Yaba%'
+        OR branch_name ILIKE '%Victoria Island%'
+        OR branch_name ILIKE '%Ikeja%'`
+  );
+
+  await runQuery(
+    `UPDATE production_orders
+     SET branch_id = 'br-surulere'
+     WHERE branch_id IS NULL
+        OR branch_id IN ('BR-LOS-YABA', 'BR-LOS-VI', 'BR-LOS-IKEJA', 'br-yaba', 'br-vi', 'br-ikeja')`
+  );
+
+  await runQuery(
+    `DELETE FROM factory_branches
+     WHERE id IN ('BR-LOS-YABA', 'BR-LOS-VI', 'BR-LOS-IKEJA', 'br-yaba', 'br-vi', 'br-ikeja')
+        OR name ILIKE '%Victoria Island%'
+        OR name ILIKE '%Ikeja%'
+        OR name ILIKE '%Yaba%'
+        OR location ILIKE '%Victoria Island%'
+        OR location ILIKE '%Ikeja%'
+        OR location ILIKE '%Yaba%'`
   );
 
   await runQuery(
     `INSERT INTO staff_users (id, name, email, access_tier, artisan_role, branch_id, branch_name, specialty, station, active_runs, units_completed_month, qc_pass_rate, shift_status, floor_status)
      VALUES
-       ('art-super-demola', 'Demola Blaze', 'demolablaze@gmail.com', 'superadmin', 'production_manager', 'BR-LOS-YABA', 'Yaba Flagship Production Plant', 'Founder, Global Superadmin & Multi-Facility Operations', 'Executive HQ · 1 Alawode Street, Lagos', 0, 0, 100, 'CLOCKED_IN', 'Executive HQ'),
-       ('art-admin-kudi', 'Kudi Lasisi', 'kudi@kproductions.com', 'admin', 'production_manager', 'BR-LOS-YABA', 'Yaba Flagship Production Plant', 'Plant Operations, Private-Label Production & Floor Management', '1 Alawode Street, Lagos', 0, 0, 100, 'CLOCKED_IN', 'Active on Floor')
-     ON CONFLICT (email) DO NOTHING`
+       ('art-super-demola', 'Demola Blaze', 'demolablaze@gmail.com', 'superadmin', 'production_manager', 'br-surulere', 'Surulere Production Plant', 'Founder, Global Superadmin & Surulere Plant Governance', 'Executive HQ, 1 Alawode Street, Surulere, Lagos', 0, 0, 100, 'CLOCKED_IN', 'Executive HQ'),
+       ('art-admin-kudi', 'Kudi Lasisi', 'kudi@kproductions.com', 'admin', 'production_manager', 'br-surulere', 'Surulere Production Plant', 'Plant Operations, Private-Label Production & Floor Management', '1 Alawode Street, Surulere, Lagos', 0, 0, 100, 'CLOCKED_IN', 'Active on Floor')
+     ON CONFLICT (email) DO UPDATE SET
+       branch_id = EXCLUDED.branch_id,
+       branch_name = EXCLUDED.branch_name`
   );
 
   const tablesRes = await runQuery(

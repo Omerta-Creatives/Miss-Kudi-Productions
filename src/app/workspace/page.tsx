@@ -42,6 +42,8 @@ import {
   setActiveBranchId,
   STAGE_METADATA,
   SupplierPurchaseOrder,
+  SURULERE_BRANCH_ID,
+  SURULERE_BRANCH_NAME,
   UserAccessTier,
 } from "../lib/production-os";
 import {
@@ -322,8 +324,8 @@ export default function FactoryWorkspacePage() {
       email: newArtisan.email.trim().toLowerCase(),
       role: newArtisan.role,
       accessTier: newArtisan.accessTier,
-      branchId: "br-yaba",
-      branchName: "Yaba Flagship Production Plant",
+      branchId: SURULERE_BRANCH_ID,
+      branchName: SURULERE_BRANCH_NAME,
       shiftStatus: "CLOCKED_IN",
       specialty:
         newArtisan.specialty.trim() ||

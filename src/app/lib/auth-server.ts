@@ -4,6 +4,7 @@ import {
   ArtisanStaff,
   INITIAL_ARTISANS,
   INITIAL_BRANCHES,
+  normalizeArtisanRecord,
   sanitizeSpecialtyText,
   UserAccessTier,
 } from "./production-os";
@@ -277,7 +278,7 @@ export function payloadToArtisan(payload: SessionTokenPayload): ArtisanStaff {
   const seed = INITIAL_ARTISANS.find(
     (a) => a.email.toLowerCase() === payload.email.toLowerCase()
   );
-  return {
+  return normalizeArtisanRecord({
     id: payload.sub,
     name: payload.name,
     email: payload.email,
@@ -288,7 +289,7 @@ export function payloadToArtisan(payload: SessionTokenPayload): ArtisanStaff {
     specialty: sanitizeSpecialtyText(
       payload.specialty || seed?.specialty || "Garment Operations"
     ),
-    station: payload.station || seed?.station || "Main Factory Floor",
+    station: payload.station || seed?.station || "Main Factory Floor, Surulere",
     activeRuns: seed?.activeRuns ?? 0,
     unitsCompletedMonth: seed?.unitsCompletedMonth ?? 0,
     qcPassRate: seed?.qcPassRate ?? 99.5,
@@ -301,7 +302,7 @@ export function payloadToArtisan(payload: SessionTokenPayload): ArtisanStaff {
         : payload.role === "quality_control"
         ? "QC Station"
         : "Active on Floor",
-  };
+  });
 }
 
 export function isHttpsRequest(request: Request | NextRequest): boolean {

@@ -794,7 +794,7 @@ export function InvoicingLedgerPanel({
               Billing Address
               <input
                 type="text"
-                placeholder="Victoria Island, Lagos"
+                placeholder="Surulere, Lagos"
                 value={clientAddress}
                 onChange={(e) => setClientAddress(e.target.value)}
               />

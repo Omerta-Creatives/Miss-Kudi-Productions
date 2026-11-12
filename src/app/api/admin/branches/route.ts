@@ -6,8 +6,13 @@ import {
 import {
   executeSqlQuery,
   getDatabaseConnectionString,
+  syncSurulereOnlyFacilityInDb,
 } from "../../../lib/database";
-import { FactoryBranch, INITIAL_BRANCHES } from "../../../lib/production-os";
+import {
+  FactoryBranch,
+  INITIAL_BRANCHES,
+  normalizeBranchesList,
+} from "../../../lib/production-os";
 import {
   attachRateLimitHeaders,
   enforceRequestRateLimit,
@@ -40,6 +45,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    await syncSurulereOnlyFacilityInDb();
+
     const { rows } = await executeSqlQuery<Record<string, any>>(
       `SELECT
         id, name, location, specialization, machine_count, staff_count,
@@ -48,19 +55,21 @@ export async function GET(request: NextRequest) {
        ORDER BY created_at ASC`
     );
 
-    const branches: FactoryBranch[] = rows.map((r) => ({
-      id: String(r.id),
-      name: String(r.name),
-      location: String(r.location),
-      specialization: String(r.specialization),
-      machineCount: Number(r.machine_count ?? 24),
-      staffCount: Number(r.staff_count ?? 6),
-      fabricMetersStock: Number(r.fabric_meters_stock ?? 1000),
-      netRevenueNgn: Number(r.net_revenue_ngn ?? 0),
-      operatingExpensesNgn: Number(r.operating_expenses_ngn ?? 0),
-      trueNetProfitNgn: Number(r.true_net_profit_ngn ?? 0),
-      status: r.status === "MAINTENANCE" ? "MAINTENANCE" : "ACTIVE",
-    }));
+    const branches: FactoryBranch[] = normalizeBranchesList(
+      rows.map((r) => ({
+        id: String(r.id),
+        name: String(r.name),
+        location: String(r.location),
+        specialization: String(r.specialization),
+        machineCount: Number(r.machine_count ?? 92),
+        staffCount: Number(r.staff_count ?? 2),
+        fabricMetersStock: Number(r.fabric_meters_stock ?? 0),
+        netRevenueNgn: Number(r.net_revenue_ngn ?? 0),
+        operatingExpensesNgn: Number(r.operating_expenses_ngn ?? 0),
+        trueNetProfitNgn: Number(r.true_net_profit_ngn ?? 0),
+        status: r.status === "MAINTENANCE" ? "MAINTENANCE" : "ACTIVE",
+      }))
+    );
 
     return attachRateLimitHeaders(
       NextResponse.json({

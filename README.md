@@ -17,9 +17,9 @@ B2B apparel manufacturing platform and production management suite for **Miss Ku
 
 ### 2. Staff Sign-In & Production Consoles (Desktop `1440×900`)
 
-| Staff & Plant Manager Sign-In (`/login`) | Multi-Facility Executive Console (`/superadmin`) |
+| Staff & Plant Manager Sign-In (`/login`) | Executive HQ Console (`/superadmin`) |
 | --- | --- |
-| ![Staff and Admin Authentication Portal](public/screenshots/02-auth-portal-desktop.png) | ![Superadmin Multi-Facility HQ](public/screenshots/03-superadmin-hq-desktop.png) |
+| ![Staff and Admin Authentication Portal](public/screenshots/02-auth-portal-desktop.png) | ![Superadmin Executive HQ](public/screenshots/03-superadmin-hq-desktop.png) |
 
 | Plant Manager & Floor Station (`/dashboard`) | Production Floor, Materials & P&L (`/workspace`) |
 | --- | --- |
@@ -41,7 +41,7 @@ B2B apparel manufacturing platform and production management suite for **Miss Ku
 - **Production Quote Studio (`/quote`) & Order Tracker (`/tracker`)**: Instant pro-forma costing, size breakdown synchronization, and printable 80mm/A4 Factory Job Tickets.
 
 ### 2. Staff Access & Production Consoles
-- **Multi-Facility Console (`/superadmin`)**: Consolidated revenue, COGS, operating expenses, team roster management, facility capacity, and activity logs across Lagos divisions.
+- **Executive HQ Console (`/superadmin`)**: Consolidated revenue, COGS, operating expenses, invoicing & official receipts, team roster management, Surulere facility capacity, and audit logs.
 - **Plant & Floor Console (`/dashboard`)**: Role-adapted view for Plant Managers (`admin` / `superadmin`) and Floor Specialists (`staff`) covering Pattern Designers, Cutting Masters, Master Tailors, and AQL 2.5 Quality Control Inspectors.
 - **Production Workspace (`/workspace`)**: 5-stage order tracking, specialist line assignment, fabric & trim runway monitoring with mill Purchase Orders, B2B brand partner directory, and P&L export.
 

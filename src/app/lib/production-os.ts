@@ -266,40 +266,20 @@ export const ACCESS_TIER_LABELS: Record<UserAccessTier, string> = {
   staff: "Artisan / Floor Staff",
 };
 
+export const SURULERE_BRANCH_ID = "br-surulere";
+export const SURULERE_BRANCH_NAME = "Surulere Production Plant";
+export const SURULERE_BRANCH_LOCATION =
+  "1 Alawode Street, Surulere, Lagos, Nigeria";
+
 export const INITIAL_BRANCHES: FactoryBranch[] = [
   {
-    id: "br-yaba",
-    name: "Yaba Flagship Production Plant",
-    location: "1 Alawode Street, Lagos, Nigeria",
-    specialization: "High-Volume Bulk Sewing, Knits, Wovens & AQL 2.5 QC Hub",
-    machineCount: 48,
+    id: SURULERE_BRANCH_ID,
+    name: SURULERE_BRANCH_NAME,
+    location: SURULERE_BRANCH_LOCATION,
+    specialization:
+      "CAD Pattern Studio, Bulk Cut-and-Sew Lines & AQL 2.5 Export Finishing",
+    machineCount: 92,
     staffCount: 2,
-    fabricMetersStock: 0,
-    netRevenueNgn: 0,
-    operatingExpensesNgn: 0,
-    trueNetProfitNgn: 0,
-    status: "ACTIVE",
-  },
-  {
-    id: "br-vi",
-    name: "Victoria Island Pattern & Sample Atelier",
-    location: "Adeola Odeku, Victoria Island, Lagos",
-    specialization: "CAD Pattern Drafting, Luxury Resortwear, Draping & Client Fittings",
-    machineCount: 16,
-    staffCount: 0,
-    fabricMetersStock: 0,
-    netRevenueNgn: 0,
-    operatingExpensesNgn: 0,
-    trueNetProfitNgn: 0,
-    status: "ACTIVE",
-  },
-  {
-    id: "br-ikeja",
-    name: "Ikeja Workwear & Export Finishing Depot",
-    location: "Ikeja Industrial Estate, Lagos",
-    specialization: "Corporate Uniforms, Heavy Twill/Denim, Steam Pressing & Export Cartons",
-    machineCount: 28,
-    staffCount: 0,
     fabricMetersStock: 0,
     netRevenueNgn: 0,
     operatingExpensesNgn: 0,
@@ -339,10 +319,10 @@ export const INITIAL_ARTISANS: ArtisanStaff[] = [
     email: "demolablaze@gmail.com",
     accessTier: "superadmin",
     role: "production_manager",
-    branchId: "br-yaba",
-    branchName: "Yaba Flagship Production Plant",
-    specialty: "Founder, Global Superadmin & Multi-Facility Operations",
-    station: "Executive HQ, Lagos",
+    branchId: SURULERE_BRANCH_ID,
+    branchName: SURULERE_BRANCH_NAME,
+    specialty: "Founder, Global Superadmin & Surulere Plant Governance",
+    station: "Executive HQ, 1 Alawode St, Surulere",
     activeRuns: 0,
     unitsCompletedMonth: 0,
     qcPassRate: 100,
@@ -355,10 +335,10 @@ export const INITIAL_ARTISANS: ArtisanStaff[] = [
     email: "kudi@kproductions.com",
     accessTier: "admin",
     role: "production_manager",
-    branchId: "br-yaba",
-    branchName: "Yaba Flagship Production Plant",
+    branchId: SURULERE_BRANCH_ID,
+    branchName: SURULERE_BRANCH_NAME,
     specialty: "Plant Operations, Private-Label Production & Floor Management",
-    station: "Plant Planning & Merchandising Desk",
+    station: "Plant Planning & Merchandising Desk, Surulere",
     activeRuns: 0,
     unitsCompletedMonth: 0,
     qcPassRate: 100,
@@ -601,7 +581,99 @@ export function isSessionAuthenticated(): boolean {
 export function sanitizeSpecialtyText(text: string): string {
   return String(text || "")
     .replace(/\s*\([^)]*user_[A-Za-z0-9]+[^)]*\)/gi, "")
+    .replace(/Multi-Facility Operations/gi, "Surulere Plant Governance")
+    .replace(/Multi-Facility/gi, "Surulere Plant")
     .trim();
+}
+
+const LEGACY_REMOVED_BRANCH_PATTERN =
+  /^(br-vi|br-ikeja|br-los-vi|br-los-ikeja)$|victoria\s*island|adeola\s*odeku|ikeja|oba\s*akran/i;
+const LEGACY_YABA_BRANCH_PATTERN = /^(br-yaba|br-los-yaba)$|yaba/i;
+
+export function normalizeBranchId(branchId?: string | null): string {
+  const clean = String(branchId || "").trim();
+  if (
+    !clean ||
+    LEGACY_REMOVED_BRANCH_PATTERN.test(clean) ||
+    LEGACY_YABA_BRANCH_PATTERN.test(clean)
+  ) {
+    return SURULERE_BRANCH_ID;
+  }
+  return clean;
+}
+
+export function normalizeBranchName(branchName?: string | null): string {
+  const clean = String(branchName || "").trim();
+  if (
+    !clean ||
+    LEGACY_REMOVED_BRANCH_PATTERN.test(clean) ||
+    LEGACY_YABA_BRANCH_PATTERN.test(clean)
+  ) {
+    return SURULERE_BRANCH_NAME;
+  }
+  return clean;
+}
+
+export function normalizeBranchesList(
+  rawBranches: FactoryBranch[]
+): FactoryBranch[] {
+  const seen = new Set<string>();
+  const cleaned: FactoryBranch[] = [];
+
+  for (const b of rawBranches || []) {
+    if (!b) continue;
+    const combined = `${b.id || ""} ${b.name || ""} ${b.location || ""}`;
+    if (
+      LEGACY_REMOVED_BRANCH_PATTERN.test(b.id || "") ||
+      LEGACY_REMOVED_BRANCH_PATTERN.test(combined)
+    ) {
+      continue;
+    }
+
+    if (
+      b.id === SURULERE_BRANCH_ID ||
+      LEGACY_YABA_BRANCH_PATTERN.test(b.id || "") ||
+      LEGACY_YABA_BRANCH_PATTERN.test(combined) ||
+      /1\s*alawode/i.test(b.location || "")
+    ) {
+      if (seen.has(SURULERE_BRANCH_ID)) continue;
+      seen.add(SURULERE_BRANCH_ID);
+      cleaned.push({
+        ...INITIAL_BRANCHES[0],
+        machineCount: Math.max(Number(b.machineCount) || 0, 92),
+        staffCount: Number(b.staffCount) || INITIAL_BRANCHES[0].staffCount,
+        fabricMetersStock: Number(b.fabricMetersStock) || 0,
+        netRevenueNgn: Number(b.netRevenueNgn) || 0,
+        operatingExpensesNgn: Number(b.operatingExpensesNgn) || 0,
+        trueNetProfitNgn: Number(b.trueNetProfitNgn) || 0,
+        status: b.status === "MAINTENANCE" ? "MAINTENANCE" : "ACTIVE",
+      });
+      continue;
+    }
+
+    if (!seen.has(b.id)) {
+      seen.add(b.id);
+      cleaned.push(b);
+    }
+  }
+
+  if (cleaned.length === 0) {
+    return [...INITIAL_BRANCHES];
+  }
+  return cleaned;
+}
+
+export function normalizeArtisanRecord(a: ArtisanStaff): ArtisanStaff {
+  const cleanStation = String(a.station || "Main Factory Floor")
+    .replace(/Victoria Island|Ikeja|Yaba/gi, "Surulere")
+    .trim();
+  return {
+    ...a,
+    branchId: normalizeBranchId(a.branchId),
+    branchName: normalizeBranchName(a.branchName),
+    specialty: sanitizeSpecialtyText(a.specialty),
+    station: cleanStation || "Main Factory Floor, Surulere",
+  };
 }
 
 export function getCurrentSessionUser(): ArtisanStaff {
@@ -617,20 +689,18 @@ export function getCurrentSessionUser(): ArtisanStaff {
       return INITIAL_ARTISANS[0];
     }
     const parsed = JSON.parse(raw) as ArtisanStaff;
-    return {
-      ...parsed,
-      specialty: sanitizeSpecialtyText(parsed.specialty),
-    };
+    return normalizeArtisanRecord(parsed);
   } catch {
     return INITIAL_ARTISANS[0];
   }
 }
 
 export function setCurrentSessionUser(
-  user: ArtisanStaff,
+  rawUser: ArtisanStaff,
   options?: { rememberMe?: boolean; expiresAt?: string; sessionId?: string }
 ) {
   if (typeof window === "undefined") return;
+  const user = normalizeArtisanRecord(rawUser);
   const existingMeta = getCurrentSessionMeta();
   const rememberMe = options?.rememberMe ?? existingMeta?.rememberMe ?? true;
   const ttlMs = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000;
@@ -726,22 +796,30 @@ export function isStaffUser(user?: ArtisanStaff | null): boolean {
 
 export function getActiveBranchId(): string {
   if (typeof window === "undefined") return INITIAL_BRANCHES[0].id;
+  const branches = loadBranches();
   const user = getCurrentSessionUser();
   if (isStaffUser(user) && user.branchId) {
-    return user.branchId;
+    const normalizedUserBranch = normalizeBranchId(user.branchId);
+    return branches.some((b) => b.id === normalizedUserBranch)
+      ? normalizedUserBranch
+      : branches[0].id;
   }
-  return (
-    localStorage.getItem(STORAGE_KEYS.ACTIVE_BRANCH) ||
-    user.branchId ||
-    INITIAL_BRANCHES[0].id
+  const stored = normalizeBranchId(
+    localStorage.getItem(STORAGE_KEYS.ACTIVE_BRANCH) || user.branchId
   );
+  const resolved = branches.some((b) => b.id === stored)
+    ? stored
+    : branches[0].id;
+  localStorage.setItem(STORAGE_KEYS.ACTIVE_BRANCH, resolved);
+  return resolved;
 }
 
 export function setActiveBranchId(branchId: string) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.ACTIVE_BRANCH, branchId);
+  const normalized = normalizeBranchId(branchId);
+  localStorage.setItem(STORAGE_KEYS.ACTIVE_BRANCH, normalized);
   window.dispatchEvent(
-    new CustomEvent("mkp:branch-change", { detail: branchId })
+    new CustomEvent("mkp:branch-change", { detail: normalized })
   );
 }
 
@@ -756,7 +834,12 @@ export function loadBranches(): FactoryBranch[] {
       );
       return INITIAL_BRANCHES;
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw) as FactoryBranch[];
+    const cleaned = normalizeBranchesList(parsed);
+    if (JSON.stringify(parsed) !== JSON.stringify(cleaned)) {
+      localStorage.setItem(STORAGE_KEYS.BRANCHES, JSON.stringify(cleaned));
+    }
+    return cleaned;
   } catch {
     return INITIAL_BRANCHES;
   }
@@ -764,7 +847,8 @@ export function loadBranches(): FactoryBranch[] {
 
 export function saveBranches(branches: FactoryBranch[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.BRANCHES, JSON.stringify(branches));
+  const cleaned = normalizeBranchesList(branches);
+  localStorage.setItem(STORAGE_KEYS.BRANCHES, JSON.stringify(cleaned));
 }
 
 export interface DraftSizeMatrixPayload {
@@ -798,7 +882,15 @@ export function loadOrders(): ProductionOrder[] {
       localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(INITIAL_ORDERS));
       return INITIAL_ORDERS;
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw) as ProductionOrder[];
+    const cleaned = parsed.map((o) => ({
+      ...o,
+      branchId: normalizeBranchId(o.branchId),
+    }));
+    if (JSON.stringify(parsed) !== JSON.stringify(cleaned)) {
+      localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(cleaned));
+    }
+    return cleaned;
   } catch {
     return INITIAL_ORDERS;
   }
@@ -833,10 +925,11 @@ export function loadArtisans(): ArtisanStaff[] {
       return INITIAL_ARTISANS;
     }
     const parsed = JSON.parse(raw) as ArtisanStaff[];
-    return parsed.map((a) => ({
-      ...a,
-      specialty: sanitizeSpecialtyText(a.specialty),
-    }));
+    const cleaned = parsed.map((a) => normalizeArtisanRecord(a));
+    if (JSON.stringify(parsed) !== JSON.stringify(cleaned)) {
+      localStorage.setItem(STORAGE_KEYS.ARTISANS, JSON.stringify(cleaned));
+    }
+    return cleaned;
   } catch {
     return INITIAL_ARTISANS;
   }
@@ -844,7 +937,8 @@ export function loadArtisans(): ArtisanStaff[] {
 
 export function saveArtisans(list: ArtisanStaff[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.ARTISANS, JSON.stringify(list));
+  const cleaned = list.map((a) => normalizeArtisanRecord(a));
+  localStorage.setItem(STORAGE_KEYS.ARTISANS, JSON.stringify(cleaned));
 }
 
 export function loadInventory(): FabricInventoryItem[] {

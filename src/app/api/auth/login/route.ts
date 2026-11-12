@@ -18,6 +18,7 @@ import {
   ArtisanStaff,
   INITIAL_ARTISANS,
   INITIAL_BRANCHES,
+  normalizeArtisanRecord,
   sanitizeSpecialtyText,
   UserAccessTier,
 } from "../../../lib/production-os";
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
           dbPasswordHash = r.password_hash ? String(r.password_hash) : null;
           failedAttempts = Number(r.failed_login_attempts ?? 0);
           lockedUntil = r.locked_until ? String(r.locked_until) : null;
-          matchedUser = {
+          matchedUser = normalizeArtisanRecord({
             id: String(r.id),
             name: String(r.name),
             email: String(r.email).toLowerCase(),
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
             branchId: String(r.branch_id || INITIAL_BRANCHES[0].id),
             branchName: String(r.branch_name || INITIAL_BRANCHES[0].name),
             specialty: sanitizeSpecialtyText(String(r.specialty || "")),
-            station: String(r.station || "Main Factory Floor"),
+            station: String(r.station || "Main Factory Floor, Surulere"),
             activeRuns: Number(r.active_runs ?? 0),
             unitsCompletedMonth: Number(r.units_completed_month ?? 0),
             qcPassRate: Number(r.qc_pass_rate ?? 99.0),
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
               r.shift_status === "OFF_SHIFT" ? "OFF_SHIFT" : "CLOCKED_IN",
             status:
               (r.floor_status as ArtisanStaff["status"]) || "Active on Floor",
-          };
+          });
         }
       } catch {
         dbReachable = false;

@@ -3,8 +3,10 @@ import {
   calculateProductionEstimate,
   computeDefaultSizeBreakdown,
   INITIAL_ORDERS,
+  normalizeBranchId,
   parseQuantityBracketToDefaultUnits,
   ProductionOrder,
+  SURULERE_BRANCH_ID,
 } from "../../lib/production-os";
 import {
   executeSqlQuery,
@@ -37,7 +39,7 @@ export async function GET(request: NextRequest) {
           id: r.id,
           jobCode: r.job_code,
           offlineId: r.offline_id,
-          branchId: r.branch_id || "BR-LOS-YABA",
+          branchId: normalizeBranchId(r.branch_id),
           company: r.company,
           email: r.email,
           phone: r.phone || "",
@@ -180,7 +182,7 @@ export async function POST(request: Request) {
     id: `ord-${Date.now()}`,
     jobCode,
     offlineId,
-    branchId: "BR-LOS-YABA",
+    branchId: SURULERE_BRANCH_ID,
     company: String(payload.company).trim(),
     email: String(payload.email).trim(),
     phone: String(payload.phone || "").trim(),

@@ -14,7 +14,12 @@ import {
   ArtisanStaff,
   INITIAL_ARTISANS,
   INITIAL_BRANCHES,
+  normalizeArtisanRecord,
+  normalizeBranchId,
+  normalizeBranchName,
   sanitizeSpecialtyText,
+  SURULERE_BRANCH_ID,
+  SURULERE_BRANCH_NAME,
   UserAccessTier,
 } from "../../../lib/production-os";
 import {
@@ -64,23 +69,25 @@ export async function GET(request: NextRequest) {
          created_at DESC`
     );
 
-    const users: ArtisanStaff[] = rows.map((r) => ({
-      id: String(r.id),
-      name: String(r.name),
-      email: String(r.email),
-      accessTier: (r.access_tier as UserAccessTier) || "staff",
-      role: (r.artisan_role as ArtisanRole) || "tailor",
-      branchId: String(r.branch_id || INITIAL_BRANCHES[0].id),
-      branchName: String(r.branch_name || INITIAL_BRANCHES[0].name),
-      specialty: sanitizeSpecialtyText(String(r.specialty || "")),
-      station: String(r.station || "Main Floor"),
-      activeRuns: Number(r.active_runs ?? 0),
-      unitsCompletedMonth: Number(r.units_completed_month ?? 0),
-      qcPassRate: Number(r.qc_pass_rate ?? 99.0),
-      shiftStatus: r.shift_status === "OFF_SHIFT" ? "OFF_SHIFT" : "CLOCKED_IN",
-      status:
-        (r.floor_status as ArtisanStaff["status"]) || "Active on Floor",
-    }));
+    const users: ArtisanStaff[] = rows.map((r) =>
+      normalizeArtisanRecord({
+        id: String(r.id),
+        name: String(r.name),
+        email: String(r.email),
+        accessTier: (r.access_tier as UserAccessTier) || "staff",
+        role: (r.artisan_role as ArtisanRole) || "tailor",
+        branchId: String(r.branch_id || INITIAL_BRANCHES[0].id),
+        branchName: String(r.branch_name || INITIAL_BRANCHES[0].name),
+        specialty: sanitizeSpecialtyText(String(r.specialty || "")),
+        station: String(r.station || "Main Floor, Surulere"),
+        activeRuns: Number(r.active_runs ?? 0),
+        unitsCompletedMonth: Number(r.units_completed_month ?? 0),
+        qcPassRate: Number(r.qc_pass_rate ?? 99.0),
+        shiftStatus: r.shift_status === "OFF_SHIFT" ? "OFF_SHIFT" : "CLOCKED_IN",
+        status:
+          (r.floor_status as ArtisanStaff["status"]) || "Active on Floor",
+      })
+    );
 
     return attachRateLimitHeaders(
       NextResponse.json({
@@ -130,10 +137,10 @@ export async function POST(request: Request) {
       password,
       accessTier = "staff",
       role = "tailor",
-      branchId = "br-yaba",
-      branchName = "Yaba Flagship Production Plant",
+      branchId = SURULERE_BRANCH_ID,
+      branchName = SURULERE_BRANCH_NAME,
       specialty = "Garment Production Specialist",
-      station = "Main Factory Floor",
+      station = "Main Factory Floor, Surulere",
       activeRuns = 1,
       unitsCompletedMonth = 0,
       qcPassRate = 99.0,
@@ -169,6 +176,8 @@ export async function POST(request: Request) {
     }
 
     const userId = id || `art-${Date.now()}`;
+    const resolvedBranchId = normalizeBranchId(branchId);
+    const resolvedBranchName = normalizeBranchName(branchName);
     const passwordHash =
       password && String(password).length >= 6
         ? await hashPassword(String(password))
@@ -202,7 +211,7 @@ export async function POST(request: Request) {
           accessTier,
           role,
           null,
-          branchName,
+          resolvedBranchName,
           cleanSpecialty,
           station,
           Number(activeRuns) || 0,
@@ -222,7 +231,7 @@ export async function POST(request: Request) {
           actor,
           auth.session.accessTier.toUpperCase(),
           email.trim().toLowerCase(),
-          `Added ${accessTier.toUpperCase()} account for ${name.trim()} (${role}) at ${branchName}.`,
+          `Added ${accessTier.toUpperCase()} account for ${name.trim()} (${role}) at ${resolvedBranchName}.`,
         ]
       );
     }
@@ -237,8 +246,8 @@ export async function POST(request: Request) {
           email: email.trim().toLowerCase(),
           accessTier,
           role,
-          branchId,
-          branchName,
+          branchId: resolvedBranchId,
+          branchName: resolvedBranchName,
           specialty: cleanSpecialty,
           station,
           activeRuns: Number(activeRuns) || 0,

@@ -84,7 +84,7 @@ Governed by [Hallmark v2.0](https://github.com/nutlope/hallmark) (`editorial` ge
 
 ## Overview
 
-Miss Kudi Productions is a B2B garment manufacturing atelier at **1 Alawode Street, Surulere, Lagos**, operating three specialized divisions across Surulere, Victoria Island, and Ikeja. Surfaces draw from unbleached pattern paper, warm ivory spec sheets, botanical olive ink, brass pattern weights, and structured factory job tickets.
+Miss Kudi Productions is a B2B garment manufacturing atelier at **1 Alawode Street, Surulere, Lagos**, operating three specialized divisions under one roof in Surulere. Surfaces draw from unbleached pattern paper, warm ivory spec sheets, botanical olive ink, brass pattern weights, and structured factory job tickets.
 
 ## Colors
 

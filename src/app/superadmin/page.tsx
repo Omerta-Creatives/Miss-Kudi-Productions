@@ -25,6 +25,7 @@ import {
   saveLocalPasswordHash,
   setActiveBranchId,
   setCurrentSessionUser,
+  SURULERE_BRANCH_ID,
   UserAccessTier,
 } from "../lib/production-os";
 import { ModalDialog } from "../components/ProductionJobTicketModal";
@@ -93,9 +94,9 @@ export default function SuperadminHqPage() {
     password: "",
     accessTier: "admin" as UserAccessTier,
     role: "production_manager" as ArtisanRole,
-    branchId: "BR-LOS-YABA",
-    station: "Executive HQ, Lagos",
-    specialty: "Multi-Facility Operations & Production Governance",
+    branchId: SURULERE_BRANCH_ID,
+    station: "Executive HQ, Surulere, Lagos",
+    specialty: "Surulere Plant Operations & Production Governance",
     shiftStatus: "CLOCKED_IN" as ArtisanStaff["shiftStatus"],
   });
 
@@ -116,6 +117,15 @@ export default function SuperadminHqPage() {
 
   useEffect(() => {
     refreshData();
+    fetch("/api/admin/branches")
+      .then((r) => r.json())
+      .then((res) => {
+        if (res?.ok && Array.isArray(res.branches) && res.branches.length > 0) {
+          saveBranches(res.branches);
+          setBranches(loadBranches());
+        }
+      })
+      .catch(() => {});
     window.addEventListener("mkp:session-change", refreshData);
     window.addEventListener("mkp:billing-change", refreshData);
     return () => {
@@ -159,13 +169,13 @@ export default function SuperadminHqPage() {
         : "tailor";
     const defaultStation =
       presetTier === "superadmin"
-        ? "Executive HQ, Lagos"
+        ? "Executive HQ, Surulere, Lagos"
         : presetTier === "admin"
         ? "Plant Planning Office, Surulere"
-        : "Sewing Line 1";
+        : "Sewing Line 1, Surulere";
     const defaultSpecialty =
       presetTier === "superadmin"
-        ? "Global HQ Governance, Multi-Facility P&L & Executive Strategy"
+        ? "Global HQ Governance, Surulere Plant P&L & Executive Strategy"
         : presetTier === "admin"
         ? "Plant Floor Scheduling, B2B Client Quotes & Artisan Dispatch"
         : "Industrial Cut-and-Sew & Quality Execution";
@@ -176,7 +186,7 @@ export default function SuperadminHqPage() {
       password: "",
       accessTier: presetTier,
       role: defaultRole,
-      branchId: branches[0]?.id || "BR-LOS-YABA",
+      branchId: branches[0]?.id || SURULERE_BRANCH_ID,
       station: defaultStation,
       specialty: defaultSpecialty,
       shiftStatus: "CLOCKED_IN",
@@ -674,19 +684,22 @@ export default function SuperadminHqPage() {
   > = {
     overview: {
       title: "Executive Summary",
-      subtitle: `Consolidated operations across ${branches.length} Lagos facilities and ${artisans.length} authorized accounts`,
+      subtitle:
+        branches.length === 1
+          ? `Surulere production hub at 1 Alawode Street across ${artisans.length} authorized accounts`
+          : `Consolidated operations across ${branches.length} facilities and ${artisans.length} authorized accounts`,
     },
     accounts: {
       title: "Team & Access",
       subtitle: `Provision and manage Superadmin, Plant Admin, and Floor Specialist permissions`,
     },
     facilities: {
-      title: "Lagos Facilities",
-      subtitle: `Production plants, machine capacity, fabric stock, and branch profitability`,
+      title: branches.length === 1 ? "Surulere Facility" : "Production Facilities",
+      subtitle: `1 Alawode Street, Surulere, Lagos: machine capacity, fabric stock, and plant profitability`,
     },
     invoicing: {
-      title: "Global Invoicing & Receipts",
-      subtitle: `Consolidated client invoices, deposits, and official payment receipts across all Lagos plants`,
+      title: "Invoicing & Receipts",
+      subtitle: `Client commercial invoices, deposits, and official payment receipts for Surulere production`,
     },
     audit: {
       title: "Security & Audit Log",
@@ -712,7 +725,7 @@ export default function SuperadminHqPage() {
     },
     {
       id: "facilities",
-      label: "Facilities",
+      label: branches.length === 1 ? "Surulere Facility" : "Facilities",
       icon: "building" as const,
       badge: branches.length,
       active: activeSection === "facilities",
@@ -829,12 +842,14 @@ export default function SuperadminHqPage() {
             <>
               <div className="kpi-grid-4">
                 <div className="kpi-card">
-                  <span className="ticket-label">Global pipeline GMV</span>
+                  <span className="ticket-label">Pipeline GMV</span>
                   <div className="kpi-value mono">
                     ₦{globalGmv.toLocaleString()}
                   </div>
                   <div className="kpi-sub">
-                    {ordersCount} active runs across {branches.length} plants
+                    {branches.length === 1
+                      ? `${ordersCount} active runs in Surulere`
+                      : `${ordersCount} active runs across ${branches.length} facilities`}
                   </div>
                 </div>
 
@@ -853,12 +868,16 @@ export default function SuperadminHqPage() {
                 </div>
 
                 <div className="kpi-card">
-                  <span className="ticket-label">Active facilities</span>
+                  <span className="ticket-label">
+                    {branches.length === 1 ? "Surulere hub" : "Active facilities"}
+                  </span>
                   <div className="kpi-value mono">
-                    {branches.length} Plants
+                    {branches.length === 1
+                      ? "Surulere HQ"
+                      : `${branches.length} Plants`}
                   </div>
                   <div className="kpi-sub">
-                    {totalMachines} industrial machines installed
+                    {totalMachines} industrial machines at 1 Alawode St
                   </div>
                 </div>
 
@@ -871,14 +890,18 @@ export default function SuperadminHqPage() {
                 </div>
               </div>
 
-              {/* Lagos Facilities Snapshot Cards */}
+              {/* Surulere Production Facility Snapshot */}
               <div className="workspace-panel" style={{ marginBottom: 24 }}>
                 <div className="panel-header-row">
                   <div>
-                    <h3>Lagos Production Facilities</h3>
+                    <h3>
+                      {branches.length === 1
+                        ? "Surulere Production Plant"
+                        : "Production Facilities"}
+                    </h3>
                     <p>
-                      Select any plant to open its floor console or adjust
-                      machine capacity.
+                      1 Alawode Street, Surulere, Lagos: open floor console or
+                      adjust machine and stock capacity.
                     </p>
                   </div>
                   <button
@@ -886,7 +909,9 @@ export default function SuperadminHqPage() {
                     className="mkp-inline-btn"
                     onClick={() => setActiveSection("facilities")}
                   >
-                    Facilities ({branches.length})
+                    {branches.length === 1
+                      ? "Facility Details"
+                      : `Facilities (${branches.length})`}
                   </button>
                 </div>
 
@@ -1143,21 +1168,23 @@ export default function SuperadminHqPage() {
                     className="table-select"
                     style={{ flex: "1 1 180px", minWidth: 0 }}
                   />
-                  <select
-                    aria-label="Filter by Facility Branch"
-                    className="table-select"
-                    value={branchFilter}
-                    onChange={(e) => setBranchFilter(e.target.value)}
-                  >
-                    <option value="all">
-                      All Facilities ({branches.length})
-                    </option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
+                  {branches.length > 1 && (
+                    <select
+                      aria-label="Filter by Facility Branch"
+                      className="table-select"
+                      value={branchFilter}
+                      onChange={(e) => setBranchFilter(e.target.value)}
+                    >
+                      <option value="all">
+                        All Facilities ({branches.length})
                       </option>
-                    ))}
-                  </select>
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
 
@@ -1689,7 +1716,7 @@ export default function SuperadminHqPage() {
               <input
                 name="station"
                 required
-                placeholder="e.g. Executive HQ, Lagos"
+                placeholder="e.g. Executive HQ, Surulere, Lagos"
                 value={newStaff.station}
                 onChange={(e) =>
                   setNewStaff((p) => ({ ...p, station: e.target.value }))
@@ -1701,7 +1728,7 @@ export default function SuperadminHqPage() {
             Technical Specialty &amp; Scope
             <input
               name="specialty"
-              placeholder="e.g. Multi-Facility Operations, CAD Pattern Grading, or AQL 2.5 QC"
+              placeholder="e.g. Surulere Plant Operations, CAD Pattern Grading, or AQL 2.5 QC"
               value={newStaff.specialty}
               onChange={(e) =>
                 setNewStaff((p) => ({ ...p, specialty: e.target.value }))
@@ -2046,7 +2073,7 @@ export default function SuperadminHqPage() {
             <input
               name="location"
               required
-              placeholder="e.g. 1 Alawode Street, Lagos, Nigeria"
+              placeholder="e.g. 1 Alawode Street, Surulere, Lagos, Nigeria"
               value={newBranch.location}
               onChange={(e) =>
                 setNewBranch((p) => ({ ...p, location: e.target.value }))

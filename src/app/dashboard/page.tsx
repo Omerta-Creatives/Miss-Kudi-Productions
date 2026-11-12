@@ -36,6 +36,9 @@ import {
   setActiveBranchId,
   setCurrentSessionUser,
   STAGE_METADATA,
+  SURULERE_BRANCH_ID,
+  SURULERE_BRANCH_LOCATION,
+  SURULERE_BRANCH_NAME,
   UserAccessTier,
 } from "../lib/production-os";
 import {
@@ -340,7 +343,7 @@ export default function RoleDashboardPage() {
       id: `ord-${Date.now()}`,
       jobCode: `MKP-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(100 + Math.random() * 900)}`,
       offlineId: `mkp-admin-${Date.now()}`,
-      branchId: activeBranch?.id || "BR-LOS-YABA",
+      branchId: activeBranch?.id || SURULERE_BRANCH_ID,
       company: newOrderForm.company.trim(),
       email: newOrderForm.email.trim().toLowerCase(),
       phone: newOrderForm.phone.trim(),
@@ -795,7 +798,7 @@ export default function RoleDashboardPage() {
     : {
         overview: {
           title: "Plant Overview",
-          subtitle: `${activeBranch?.name || "Surulere Flagship Plant"}, ${activeBranch?.location || "Lagos"}`,
+          subtitle: `${activeBranch?.name || SURULERE_BRANCH_NAME}, ${activeBranch?.location || SURULERE_BRANCH_LOCATION}`,
         },
         orders: {
           title: "Production Orders",
@@ -2697,7 +2700,7 @@ export default function RoleDashboardPage() {
       <ModalDialog
         open={createStaffModalOpen}
         onClose={() => setCreateStaffModalOpen(false)}
-        title={`Add Team Member — ${activeBranch?.name || "Lagos Plant"}`}
+        title={`Add Team Member — ${activeBranch?.name || SURULERE_BRANCH_NAME}`}
         maxWidth={540}
       >
         <form

@@ -5,7 +5,11 @@ import {
   INITIAL_EXPENSES,
   INITIAL_FABRIC_INVENTORY,
   INITIAL_ORDERS,
+  normalizeBranchId,
   ProductionOrder,
+  SURULERE_BRANCH_ID,
+  SURULERE_BRANCH_LOCATION,
+  SURULERE_BRANCH_NAME,
 } from "./production-os";
 
 export interface PlatformStatus {
@@ -251,28 +255,7 @@ export async function initializeDatabaseSchemaAndSeed(): Promise<{
     await executeSqlQuery(ddl);
   }
 
-  for (const b of INITIAL_BRANCHES) {
-    await executeSqlQuery(
-      `INSERT INTO factory_branches (
-        id, name, location, specialization, machine_count, staff_count,
-        fabric_meters_stock, net_revenue_ngn, operating_expenses_ngn, true_net_profit_ngn, status
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-      ON CONFLICT (id) DO NOTHING`,
-      [
-        b.id,
-        b.name,
-        b.location,
-        b.specialization,
-        b.machineCount,
-        b.staffCount,
-        b.fabricMetersStock,
-        b.netRevenueNgn,
-        b.operatingExpensesNgn,
-        b.trueNetProfitNgn,
-        b.status,
-      ]
-    );
-  }
+  await syncSurulereOnlyFacilityInDb();
 
   for (const a of INITIAL_ARTISANS) {
     await executeSqlQuery(
@@ -280,7 +263,9 @@ export async function initializeDatabaseSchemaAndSeed(): Promise<{
         id, name, email, access_tier, artisan_role, branch_id, branch_name,
         specialty, station, active_runs, units_completed_month, qc_pass_rate, shift_status, floor_status
       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-      ON CONFLICT (email) DO NOTHING`,
+      ON CONFLICT (email) DO UPDATE SET
+        branch_id = $6,
+        branch_name = $7`,
       [
         a.id,
         a.name,
@@ -316,7 +301,7 @@ export async function initializeDatabaseSchemaAndSeed(): Promise<{
         o.id,
         o.jobCode,
         o.offlineId,
-        o.branchId || "BR-LOS-YABA",
+        normalizeBranchId(o.branchId),
         o.company,
         o.email,
         o.phone,
@@ -410,6 +395,75 @@ export async function initializeDatabaseSchemaAndSeed(): Promise<{
 }
 
 /**
+ * Ensures only the Surulere facility exists and migrates any legacy Yaba / VI / Ikeja records.
+ */
+export async function syncSurulereOnlyFacilityInDb(): Promise<void> {
+  if (!getDatabaseConnectionString()) return;
+  const surulere = INITIAL_BRANCHES[0];
+
+  await executeSqlQuery(
+    `INSERT INTO factory_branches (
+      id, name, location, specialization, machine_count, staff_count,
+      fabric_meters_stock, net_revenue_ngn, operating_expenses_ngn, true_net_profit_ngn, status
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    ON CONFLICT (id) DO UPDATE SET
+      name = EXCLUDED.name,
+      location = EXCLUDED.location`,
+    [
+      surulere.id,
+      surulere.name,
+      surulere.location,
+      surulere.specialization,
+      surulere.machineCount,
+      surulere.staffCount,
+      surulere.fabricMetersStock,
+      surulere.netRevenueNgn,
+      surulere.operatingExpensesNgn,
+      surulere.trueNetProfitNgn,
+      surulere.status,
+    ]
+  );
+
+  await executeSqlQuery(
+    `UPDATE staff_users
+     SET branch_id = $1,
+         branch_name = $2
+     WHERE branch_id IS NULL
+        OR branch_id IN ('BR-LOS-YABA', 'BR-LOS-VI', 'BR-LOS-IKEJA', 'br-yaba', 'br-vi', 'br-ikeja')
+        OR branch_name ILIKE '%Yaba%'
+        OR branch_name ILIKE '%Victoria Island%'
+        OR branch_name ILIKE '%Ikeja%'`,
+    [SURULERE_BRANCH_ID, SURULERE_BRANCH_NAME]
+  ).catch(() => {});
+
+  await executeSqlQuery(
+    `UPDATE production_orders
+     SET branch_id = $1
+     WHERE branch_id IS NULL
+        OR branch_id IN ('BR-LOS-YABA', 'BR-LOS-VI', 'BR-LOS-IKEJA', 'br-yaba', 'br-vi', 'br-ikeja')`,
+    [SURULERE_BRANCH_ID]
+  ).catch(() => {});
+
+  await executeSqlQuery(
+    `DELETE FROM factory_branches
+     WHERE id IN ('BR-LOS-YABA', 'BR-LOS-VI', 'BR-LOS-IKEJA', 'br-yaba', 'br-vi', 'br-ikeja')
+        OR name ILIKE '%Victoria Island%'
+        OR name ILIKE '%Ikeja%'
+        OR name ILIKE '%Yaba%'
+        OR location ILIKE '%Victoria Island%'
+        OR location ILIKE '%Ikeja%'
+        OR location ILIKE '%Yaba%'`
+  ).catch(() => {});
+
+  await executeSqlQuery(
+    `UPDATE factory_branches
+     SET location = $2
+     WHERE id = $1`,
+    [SURULERE_BRANCH_ID, SURULERE_BRANCH_LOCATION]
+  ).catch(() => {});
+}
+
+/**
  * Inserts a new ProductionOrder into PostgreSQL if configured.
  */
 export async function insertProductionOrder(
@@ -431,7 +485,7 @@ export async function insertProductionOrder(
       o.id,
       o.jobCode,
       o.offlineId,
-      o.branchId || "BR-LOS-YABA",
+      normalizeBranchId(o.branchId),
       o.company,
       o.email,
       o.phone,
