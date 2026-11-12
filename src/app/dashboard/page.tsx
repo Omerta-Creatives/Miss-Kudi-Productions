@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { UiIcon } from "../components/UiIcon";
 import {
@@ -10,9 +9,11 @@ import {
   ARTISAN_ROLE_LABELS,
   ArtisanRole,
   ArtisanStaff,
+  buildInvoiceFromOrder,
   calculateProductionEstimate,
   canManageFactory,
   clearCurrentSessionUser,
+  ClientInvoice,
   computeDefaultSizeBreakdown,
   FabricInventoryItem,
   FactoryBranch,
@@ -23,11 +24,13 @@ import {
   loadArtisans,
   loadBranches,
   loadInventory,
+  loadInvoices,
   loadOrders,
   ProductionOrder,
   ProductionStage,
   saveArtisans,
   saveInventory,
+  saveInvoices,
   saveLocalPasswordHash,
   saveOrders,
   setActiveBranchId,
@@ -39,8 +42,16 @@ import {
   ModalDialog,
   ProductionJobTicketModal,
 } from "../components/ProductionJobTicketModal";
+import { ConsoleSidebar } from "../components/ConsoleSidebar";
+import { InvoicingLedgerPanel } from "../components/InvoicingLedgerPanel";
+import { InvoiceDocumentModal } from "../components/InvoiceReceiptModal";
 
-type DashboardSection = "overview" | "orders" | "roster" | "inventory";
+type DashboardSection =
+  | "overview"
+  | "orders"
+  | "invoicing"
+  | "roster"
+  | "inventory";
 
 export default function RoleDashboardPage() {
   const router = useRouter();
@@ -52,6 +63,7 @@ export default function RoleDashboardPage() {
   const [artisans, setArtisans] = useState<ArtisanStaff[]>([]);
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
   const [inventory, setInventory] = useState<FabricInventoryItem[]>([]);
+  const [invoices, setInvoices] = useState<ClientInvoice[]>([]);
   const [showAllFloorRuns, setShowAllFloorRuns] = useState(false);
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [orderSearch, setOrderSearch] = useState("");
@@ -60,10 +72,14 @@ export default function RoleDashboardPage() {
   const [activeSection, setActiveSection] =
     useState<DashboardSection>("overview");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<ProductionOrder | null>(
     null
   );
   const [ticketOpen, setTicketOpen] = useState(false);
+  const [quickInvoiceDoc, setQuickInvoiceDoc] = useState<ClientInvoice | null>(
+    null
+  );
   const [notice, setNotice] = useState("");
   const [signingOut, setSigningOut] = useState(false);
 
@@ -129,17 +145,52 @@ export default function RoleDashboardPage() {
     setArtisans(loadArtisans());
     setOrders(loadOrders());
     setInventory(loadInventory());
+    setInvoices(loadInvoices());
   };
 
   useEffect(() => {
     syncDashboard();
     window.addEventListener("mkp:session-change", syncDashboard);
     window.addEventListener("mkp:branch-change", syncDashboard);
+    window.addEventListener("mkp:billing-change", syncDashboard);
     return () => {
       window.removeEventListener("mkp:session-change", syncDashboard);
       window.removeEventListener("mkp:branch-change", syncDashboard);
+      window.removeEventListener("mkp:billing-change", syncDashboard);
     };
   }, []);
+
+  const handleToggleSidebar = () => {
+    if (typeof window !== "undefined" && window.innerWidth <= 1080) {
+      setMobileSidebarOpen((prev) => !prev);
+    } else {
+      setSidebarCollapsed((prev) => !prev);
+    }
+  };
+
+  const handleOpenOrCreateOrderInvoice = (ord: ProductionOrder) => {
+    const currentInvoices = loadInvoices();
+    const existing = currentInvoices.find((inv) => inv.jobCode === ord.jobCode);
+    if (existing) {
+      setQuickInvoiceDoc(existing);
+      return;
+    }
+    const created = buildInvoiceFromOrder(ord);
+    const next = [created, ...currentInvoices];
+    setInvoices(next);
+    saveInvoices(next);
+    appendAuditLog({
+      action: "finance.invoice_issued",
+      actor: user.name,
+      role: ACCESS_TIER_LABELS[user.accessTier],
+      targetRef: created.invoiceNumber,
+      summary: `Generated commercial invoice ${created.invoiceNumber} from order ${ord.jobCode} (${ord.company}).`,
+    });
+    setQuickInvoiceDoc(created);
+    showToast(
+      `Generated commercial invoice ${created.invoiceNumber} for ${ord.company}.`
+    );
+  };
 
   const showToast = (msg: string) => {
     setNotice(msg);
@@ -182,7 +233,7 @@ export default function RoleDashboardPage() {
     appendAuditLog({
       action: nextShift === "CLOCKED_IN" ? "shift.clock_in" : "shift.clock_out",
       actor: user.name,
-      role: `Staff · ${ARTISAN_ROLE_LABELS[user.role]}`,
+      role: `Staff, ${ARTISAN_ROLE_LABELS[user.role]}`,
       targetRef: user.station,
       summary: `${user.name} (${ARTISAN_ROLE_LABELS[user.role]}) ${
         nextShift === "CLOCKED_IN" ? "clocked in to" : "clocked out from"
@@ -260,7 +311,7 @@ export default function RoleDashboardPage() {
     appendAuditLog({
       action: `staff.${actionType}`,
       actor: user.name,
-      role: `Staff · ${ARTISAN_ROLE_LABELS[user.role]}`,
+      role: `Staff, ${ARTISAN_ROLE_LABELS[user.role]}`,
       targetRef: order.jobCode,
       summary: `${user.name} (${ARTISAN_ROLE_LABELS[user.role]}) executed ${actionType.replace(
         "_",
@@ -324,7 +375,7 @@ export default function RoleDashboardPage() {
       actor: user.name,
       role: ACCESS_TIER_LABELS[user.accessTier],
       targetRef: created.jobCode,
-      summary: `Created production order ${created.jobCode} for ${created.company} (${created.exactQuantity} pcs · ₦${created.totalQuoteNgn.toLocaleString()}).`,
+      summary: `Created production order ${created.jobCode} for ${created.company} (${created.exactQuantity} pcs, ₦${created.totalQuoteNgn.toLocaleString()}).`,
     });
     setCreateOrderModalOpen(false);
     setNewOrderForm({
@@ -516,7 +567,7 @@ export default function RoleDashboardPage() {
       actor: user.name,
       role: ACCESS_TIER_LABELS[user.accessTier],
       targetRef: updated.email,
-      summary: `Updated ${updated.name} (${updated.accessTier.toUpperCase()} · ${ARTISAN_ROLE_LABELS[updated.role]})${nextPassword ? " and rotated login password" : ""}.`,
+      summary: `Updated ${updated.name} (${updated.accessTier.toUpperCase()}, ${ARTISAN_ROLE_LABELS[updated.role]})${nextPassword ? " and rotated login password" : ""}.`,
     });
     setEditStaffPassword("");
     setEditingStaff(null);
@@ -715,13 +766,6 @@ export default function RoleDashboardPage() {
   const tailors = artisans.filter((a) => a.role === "tailor");
   const qcInspectors = artisans.filter((a) => a.role === "quality_control");
 
-  const userInitials = user.name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
   const sectionHeadingMeta: Record<
     DashboardSection,
     { title: string; subtitle: string }
@@ -729,11 +773,15 @@ export default function RoleDashboardPage() {
     ? {
         overview: {
           title: `${user.name.split(" ")[0]}’s Station`,
-          subtitle: `${ARTISAN_ROLE_LABELS[user.role]} · ${user.station} · ${user.branchName}`,
+          subtitle: `${ARTISAN_ROLE_LABELS[user.role]}, ${user.station}, ${user.branchName}`,
         },
         orders: {
           title: showAllFloorRuns ? "All Plant Orders" : "My Work Queue",
-          subtitle: `${displayedStaffOrders.length} active production runs · ${user.branchName}`,
+          subtitle: `${displayedStaffOrders.length} active production runs at ${user.branchName}`,
+        },
+        invoicing: {
+          title: "Client Billing",
+          subtitle: "Invoices and official receipts are managed by Plant Accounts",
         },
         roster: {
           title: "Plant Team",
@@ -747,11 +795,15 @@ export default function RoleDashboardPage() {
     : {
         overview: {
           title: "Plant Overview",
-          subtitle: `${activeBranch?.name || "Yaba Flagship Plant"} · ${activeBranch?.location || "Lagos"}`,
+          subtitle: `${activeBranch?.name || "Surulere Flagship Plant"}, ${activeBranch?.location || "Lagos"}`,
         },
         orders: {
           title: "Production Orders",
           subtitle: `Manage client runs, floor stages, and job tickets for ${activeBranch?.name || "this plant"}`,
+        },
+        invoicing: {
+          title: "Invoicing & Official Receipts",
+          subtitle: `Client commercial invoices, deposits, and official payment receipts for ${activeBranch?.name || "this plant"}`,
         },
         roster: {
           title: "Team Roster",
@@ -772,7 +824,7 @@ export default function RoleDashboardPage() {
           style={{ minHeight: 34, padding: "0 12px", fontSize: 10.5 }}
           onClick={() => handleStaffBatchAction(ord, "approve_pattern")}
         >
-          ✓ Approve Pattern
+          Approve Pattern
         </button>
       );
     }
@@ -807,10 +859,92 @@ export default function RoleDashboardPage() {
         style={{ minHeight: 34, padding: "0 12px", fontSize: 10.5 }}
         onClick={() => handleStaffBatchAction(ord, "pass_qc")}
       >
-        ✓ Pass +50 QC
+        Pass +50 QC
       </button>
     );
   };
+
+  const sidebarItems = isStaff
+    ? [
+        {
+          id: "overview",
+          label: "Station Overview",
+          icon: "grid" as const,
+          active: activeSection === "overview",
+          onSelect: () => setActiveSection("overview"),
+        },
+        {
+          id: "my-queue",
+          label: "My Work Queue",
+          icon: "layers" as const,
+          badge: myAssignedOrders.length,
+          active: activeSection === "orders" && !showAllFloorRuns,
+          onSelect: () => {
+            setActiveSection("orders");
+            setShowAllFloorRuns(false);
+          },
+        },
+        {
+          id: "all-orders",
+          label: "All Plant Orders",
+          icon: "compass" as const,
+          badge: orders.length,
+          active: activeSection === "orders" && showAllFloorRuns,
+          onSelect: () => {
+            setActiveSection("orders");
+            setShowAllFloorRuns(true);
+          },
+        },
+        {
+          id: "inventory",
+          label: "Materials Lookup",
+          icon: "box" as const,
+          badge: inventory.length,
+          active: activeSection === "inventory",
+          onSelect: () => setActiveSection("inventory"),
+        },
+      ]
+    : [
+        {
+          id: "overview",
+          label: "Overview",
+          icon: "grid" as const,
+          active: activeSection === "overview",
+          onSelect: () => setActiveSection("overview"),
+        },
+        {
+          id: "orders",
+          label: "Production Orders",
+          icon: "layers" as const,
+          badge: orders.length,
+          active: activeSection === "orders",
+          onSelect: () => setActiveSection("orders"),
+        },
+        {
+          id: "invoicing",
+          label: "Invoicing & Receipts",
+          icon: "receipt" as const,
+          badge: invoices.length,
+          active: activeSection === "invoicing",
+          onSelect: () => setActiveSection("invoicing"),
+        },
+        {
+          id: "roster",
+          label: "Team Roster",
+          icon: "users" as const,
+          badge: branchStaff.length,
+          active: activeSection === "roster",
+          onSelect: () => setActiveSection("roster"),
+        },
+        {
+          id: "inventory",
+          label: "Materials & Stock",
+          icon: "box" as const,
+          badge: inventory.length,
+          active: activeSection === "inventory",
+          onSelect: () => setActiveSection("inventory"),
+        },
+      ];
 
   return (
     <main>
@@ -819,263 +953,19 @@ export default function RoleDashboardPage() {
           sidebarCollapsed ? "sidebar-collapsed" : ""
         }`}
       >
-        {/* CALM ROLE-ADAPTIVE SIDEBAR */}
-        <aside
-          className="dashboard-sidebar"
-          aria-label={
-            isStaff ? "Staff Station Navigation" : "Plant Console Navigation"
-          }
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {/* Identity & Single Facility Switcher */}
-            <div className="sidebar-identity-card">
-              <div className="sidebar-identity-top">
-                <span className="sidebar-avatar" aria-hidden="true">
-                  {userInitials}
-                </span>
-                <div className="sidebar-identity-meta">
-                  <div className="sidebar-user-name">{user.name}</div>
-                  <div className="sidebar-user-email">{user.email}</div>
-                </div>
-              </div>
-              <div className="sidebar-identity-status">
-                <span className="mkp-badge mkp-badge-olive">
-                  {ARTISAN_ROLE_LABELS[user.role]}
-                </span>
-                <span
-                  className="mono"
-                  style={{ fontSize: 10, color: "var(--muted)" }}
-                >
-                  {user.shiftStatus === "CLOCKED_IN"
-                    ? "● On Shift"
-                    : "○ Off Shift"}
-                </span>
-              </div>
-
-              {!isStaff ? (
-                <label className="sidebar-facility-picker">
-                  <span className="mono">ACTIVE PLANT</span>
-                  <select
-                    aria-label="Active Facility Branch"
-                    className="table-select"
-                    style={{ width: "100%" }}
-                    value={activeBranch?.id || ""}
-                    onChange={(e) => setActiveBranchId(e.target.value)}
-                  >
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : (
-                <div
-                  className="mono"
-                  style={{ fontSize: 10.5, color: "var(--muted)" }}
-                >
-                  Station: <strong>{user.station}</strong>
-                </div>
-              )}
-            </div>
-
-            {/* Clean 4-Item Module Navigation */}
-            <nav
-              aria-label={
-                isStaff ? "Station Navigation" : "Plant Console Modules"
-              }
-            >
-              <div className="sidebar-section-label">WORKSPACE</div>
-              {isStaff ? (
-                <ul className="sidebar-nav-list">
-                  <li>
-                    <button
-                      type="button"
-                      className={`sidebar-nav-btn ${
-                        activeSection === "overview" ? "active" : ""
-                      }`}
-                      onClick={() => setActiveSection("overview")}
-                    >
-                      <span className="sidebar-nav-btn-label">
-                        <span className="sidebar-nav-icon" aria-hidden="true">
-                          ◈
-                        </span>
-                        <span>Station Overview</span>
-                      </span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      className={`sidebar-nav-btn ${
-                        activeSection === "orders" && !showAllFloorRuns
-                          ? "active"
-                          : ""
-                      }`}
-                      onClick={() => {
-                        setActiveSection("orders");
-                        setShowAllFloorRuns(false);
-                      }}
-                    >
-                      <span className="sidebar-nav-btn-label">
-                        <span className="sidebar-nav-icon" aria-hidden="true">
-                          <UiIcon name="settings" size={14} />
-                        </span>
-                        <span>My Work Queue</span>
-                      </span>
-                      <span className="sidebar-nav-badge">
-                        {myAssignedOrders.length}
-                      </span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      className={`sidebar-nav-btn ${
-                        activeSection === "orders" && showAllFloorRuns
-                          ? "active"
-                          : ""
-                      }`}
-                      onClick={() => {
-                        setActiveSection("orders");
-                        setShowAllFloorRuns(true);
-                      }}
-                    >
-                      <span className="sidebar-nav-btn-label">
-                        <span className="sidebar-nav-icon" aria-hidden="true">
-                          ⊞
-                        </span>
-                        <span>All Plant Orders</span>
-                      </span>
-                      <span className="sidebar-nav-badge">{orders.length}</span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      className={`sidebar-nav-btn ${
-                        activeSection === "inventory" ? "active" : ""
-                      }`}
-                      onClick={() => setActiveSection("inventory")}
-                    >
-                      <span className="sidebar-nav-btn-label">
-                        <span className="sidebar-nav-icon" aria-hidden="true">
-                          ▤
-                        </span>
-                        <span>Materials Lookup</span>
-                      </span>
-                      <span className="sidebar-nav-badge">
-                        {inventory.length}
-                      </span>
-                    </button>
-                  </li>
-                </ul>
-              ) : (
-                <ul className="sidebar-nav-list">
-                  <li>
-                    <button
-                      type="button"
-                      className={`sidebar-nav-btn ${
-                        activeSection === "overview" ? "active" : ""
-                      }`}
-                      onClick={() => setActiveSection("overview")}
-                    >
-                      <span className="sidebar-nav-btn-label">
-                        <span className="sidebar-nav-icon" aria-hidden="true">
-                          ◈
-                        </span>
-                        <span>Overview</span>
-                      </span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      className={`sidebar-nav-btn ${
-                        activeSection === "orders" ? "active" : ""
-                      }`}
-                      onClick={() => setActiveSection("orders")}
-                    >
-                      <span className="sidebar-nav-btn-label">
-                        <span className="sidebar-nav-icon" aria-hidden="true">
-                          ⊞
-                        </span>
-                        <span>Production Orders</span>
-                      </span>
-                      <span className="sidebar-nav-badge">{orders.length}</span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      className={`sidebar-nav-btn ${
-                        activeSection === "roster" ? "active" : ""
-                      }`}
-                      onClick={() => setActiveSection("roster")}
-                    >
-                      <span className="sidebar-nav-btn-label">
-                        <span className="sidebar-nav-icon" aria-hidden="true">
-                          ◆
-                        </span>
-                        <span>Team Roster</span>
-                      </span>
-                      <span className="sidebar-nav-badge">
-                        {branchStaff.length}
-                      </span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      className={`sidebar-nav-btn ${
-                        activeSection === "inventory" ? "active" : ""
-                      }`}
-                      onClick={() => setActiveSection("inventory")}
-                    >
-                      <span className="sidebar-nav-btn-label">
-                        <span className="sidebar-nav-icon" aria-hidden="true">
-                          ▤
-                        </span>
-                        <span>Materials &amp; Stock</span>
-                      </span>
-                      <span className="sidebar-nav-badge">
-                        {inventory.length}
-                      </span>
-                    </button>
-                  </li>
-                </ul>
-              )}
-            </nav>
-          </div>
-
-          {/* Clean Session & Account Footer */}
-          <div className="sidebar-footer-card">
-            <div className="sidebar-section-label" style={{ marginTop: 0 }}>
-              Session
-            </div>
-            {isSuper && (
-              <Link className="sidebar-quick-btn" href="/superadmin">
-                <span>Superadmin HQ</span>
-                <UiIcon name="star" size={14} />
-              </Link>
-            )}
-            <Link
-              className="sidebar-quick-btn"
-              href="/login?mode=change-password"
-            >
-              <span>Change Password</span>
-              <UiIcon name="settings" size={14} />
-            </Link>
-            <button
-              type="button"
-              className="sidebar-quick-btn sidebar-signout-btn"
-              onClick={handleSignOut}
-              disabled={signingOut}
-            >
-              <span>{signingOut ? "Signing out..." : "Sign Out"}</span>
-            </button>
-          </div>
-        </aside>
+        <ConsoleSidebar
+          user={user}
+          groupLabel={isStaff ? "Station Workspace" : "Plant Console"}
+          items={sidebarItems}
+          branches={branches}
+          activeBranchId={activeBranch?.id}
+          onBranchChange={(nextId) => setActiveBranchId(nextId)}
+          collapsed={sidebarCollapsed}
+          mobileOpen={mobileSidebarOpen}
+          onCloseMobile={() => setMobileSidebarOpen(false)}
+          onSignOut={handleSignOut}
+          signingOut={signingOut}
+        />
 
         {/* MAIN CALM WORKSPACE */}
         <section className="dashboard-main">
@@ -1085,11 +975,11 @@ export default function RoleDashboardPage() {
               <button
                 type="button"
                 className="sidebar-toggle-btn"
-                aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+                aria-label="Toggle studio navigation sidebar"
                 aria-expanded={!sidebarCollapsed}
-                onClick={() => setSidebarCollapsed((prev) => !prev)}
+                onClick={handleToggleSidebar}
               >
-                <span aria-hidden="true">☰</span>
+                <UiIcon name="menu" size={16} />
               </button>
               <div>
                 <h1 className="dashboard-page-title">
@@ -1114,8 +1004,17 @@ export default function RoleDashboardPage() {
                   onClick={handleToggleShift}
                 >
                   {user.shiftStatus === "CLOCKED_IN"
-                    ? "● Clocked In · End Shift"
-                    : "○ Off Shift · Clock In"}
+                    ? "Clocked in (End shift)"
+                    : "Off shift (Clock in)"}
+                </button>
+              ) : activeSection === "invoicing" ? (
+                <button
+                  type="button"
+                  className="button button-light"
+                  style={{ minHeight: 40 }}
+                  onClick={() => setActiveSection("orders")}
+                >
+                  Production Orders ({orders.length})
                 </button>
               ) : activeSection === "roster" ? (
                 <button
@@ -1166,14 +1065,14 @@ export default function RoleDashboardPage() {
                 <>
                   <div className="kpi-grid-4">
                     <div className="kpi-card">
-                      <span className="ticket-label">ASSIGNED QUEUE</span>
+                      <span className="ticket-label">Assigned queue</span>
                       <div className="kpi-value mono">
                         {myAssignedOrders.length} Runs
                       </div>
                       <div className="kpi-sub">{user.station}</div>
                     </div>
                     <div className="kpi-card">
-                      <span className="ticket-label">MONTHLY OUTPUT</span>
+                      <span className="ticket-label">Monthly output</span>
                       <div
                         className="kpi-value mono"
                         style={{ color: "var(--ink)" }}
@@ -1185,18 +1084,18 @@ export default function RoleDashboardPage() {
                       </div>
                     </div>
                     <div className="kpi-card">
-                      <span className="ticket-label">FIRST-PASS QC YIELD</span>
+                      <span className="ticket-label">First-pass QC yield</span>
                       <div className="kpi-value mono">
                         {user.qcPassRate.toFixed(1)}%
                       </div>
                       <div className="kpi-sub">Target ≥ 98.0% (AQL 2.5)</div>
                     </div>
                     <div className="kpi-card">
-                      <span className="ticket-label">SHIFT STATUS</span>
+                      <span className="ticket-label">Shift status</span>
                       <div className="kpi-value" style={{ fontSize: 18 }}>
                         {user.shiftStatus === "CLOCKED_IN"
-                          ? "Clocked In"
-                          : "Off Shift"}
+                          ? "Clocked in"
+                          : "Off shift"}
                       </div>
                       <div className="kpi-sub">{user.branchName}</div>
                     </div>
@@ -1267,7 +1166,7 @@ export default function RoleDashboardPage() {
                                   setTicketOpen(true);
                                 }}
                               >
-                                Ticket
+                                <UiIcon name="print" size={13} /> Ticket
                               </button>
                             </div>
                           </div>
@@ -1313,7 +1212,7 @@ export default function RoleDashboardPage() {
                                   </span>
                                 </div>
                                 <div className="summary-row-sub">
-                                  {item.category} · Batch {item.batchLot}
+                                  {item.category}, Batch {item.batchLot}
                                 </div>
                               </div>
                               <div className="summary-list-actions mono">
@@ -1421,8 +1320,8 @@ export default function RoleDashboardPage() {
                                 <div className="mono" style={{ fontSize: 11 }}>
                                   <strong>
                                     {ord.exactQuantity.toLocaleString()} pcs
-                                  </strong>{" "}
-                                  · Due {ord.targetDeliveryDate}
+                                  </strong>
+                                  , Due {ord.targetDeliveryDate}
                                 </div>
                               </td>
                               <td>
@@ -1471,7 +1370,7 @@ export default function RoleDashboardPage() {
                                       setTicketOpen(true);
                                     }}
                                   >
-                                    Ticket 🖨
+                                    <UiIcon name="print" size={13} /> Ticket
                                   </button>
                                 </div>
                               </td>
@@ -1552,7 +1451,7 @@ export default function RoleDashboardPage() {
                                       color: "var(--muted)",
                                     }}
                                   >
-                                    {item.sku} · Batch {item.batchLot}
+                                    {item.sku}, Batch {item.batchLot}
                                   </span>
                                 </th>
                                 <td>{item.category}</td>
@@ -1581,7 +1480,7 @@ export default function RoleDashboardPage() {
                 <>
                   <div className="kpi-grid-4">
                     <div className="kpi-card">
-                      <span className="ticket-label">PIPELINE REVENUE</span>
+                      <span className="ticket-label">Pipeline revenue</span>
                       <div className="kpi-value mono">
                         ₦{branchRevenue.toLocaleString()}
                       </div>
@@ -1591,7 +1490,7 @@ export default function RoleDashboardPage() {
                     </div>
 
                     <div className="kpi-card">
-                      <span className="ticket-label">EST. GROSS MARGIN</span>
+                      <span className="ticket-label">Est. gross margin</span>
                       <div
                         className="kpi-value mono"
                         style={{ color: "var(--ink)" }}
@@ -1602,7 +1501,7 @@ export default function RoleDashboardPage() {
                     </div>
 
                     <div className="kpi-card">
-                      <span className="ticket-label">PLANT TEAM</span>
+                      <span className="ticket-label">Plant team</span>
                       <div className="kpi-value mono">
                         {branchStaff.length} Members
                       </div>
@@ -1612,7 +1511,7 @@ export default function RoleDashboardPage() {
                     </div>
 
                     <div className="kpi-card">
-                      <span className="ticket-label">STOCK ALERTS</span>
+                      <span className="ticket-label">Stock alerts</span>
                       <div className="kpi-value mono">
                         {lowStockItems.length} Low
                       </div>
@@ -1701,12 +1600,21 @@ export default function RoleDashboardPage() {
                               <button
                                 type="button"
                                 className="mkp-inline-btn"
+                                onClick={() =>
+                                  handleOpenOrCreateOrderInvoice(ord)
+                                }
+                              >
+                                <UiIcon name="receipt" size={13} /> Invoice
+                              </button>
+                              <button
+                                type="button"
+                                className="mkp-inline-btn"
                                 onClick={() => {
                                   setSelectedOrder(ord);
                                   setTicketOpen(true);
                                 }}
                               >
-                                Ticket
+                                <UiIcon name="print" size={13} /> Ticket
                               </button>
                             </div>
                           </div>
@@ -1769,7 +1677,7 @@ export default function RoleDashboardPage() {
                                       <strong>{item.name}</strong>
                                     </div>
                                     <div className="summary-row-sub mono">
-                                      {item.sku} ·{" "}
+                                      {item.sku},{" "}
                                       {item.stockLevel.toLocaleString()}{" "}
                                       {item.unit}
                                     </div>
@@ -1845,7 +1753,7 @@ export default function RoleDashboardPage() {
                                   </span>
                                 </div>
                                 <div className="summary-row-sub">
-                                  {sp.station} · {sp.qcPassRate.toFixed(1)}% QC
+                                  {sp.station}, {sp.qcPassRate.toFixed(1)}% QC
                                 </div>
                               </div>
                               <div className="summary-list-actions mono">
@@ -1859,8 +1767,8 @@ export default function RoleDashboardPage() {
                                   }}
                                 >
                                   {sp.shiftStatus === "CLOCKED_IN"
-                                    ? "● On Shift"
-                                    : "○ Off Shift"}
+                                    ? "On shift"
+                                    : "Off shift"}
                                 </span>
                               </div>
                             </div>
@@ -1963,8 +1871,8 @@ export default function RoleDashboardPage() {
                                 <div className="mono" style={{ fontSize: 11 }}>
                                   <strong>
                                     {ord.exactQuantity.toLocaleString()} pcs
-                                  </strong>{" "}
-                                  · ₦{ord.totalQuoteNgn.toLocaleString()}
+                                  </strong>
+                                  , ₦{ord.totalQuoteNgn.toLocaleString()}
                                 </div>
                               </td>
                               <td>
@@ -2029,6 +1937,15 @@ export default function RoleDashboardPage() {
                                   <button
                                     type="button"
                                     className="mkp-inline-btn"
+                                    onClick={() =>
+                                      handleOpenOrCreateOrderInvoice(ord)
+                                    }
+                                  >
+                                    <UiIcon name="receipt" size={13} /> Invoice
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="mkp-inline-btn"
                                     onClick={() => {
                                       setSelectedOrder(ord);
                                       setTicketOpen(true);
@@ -2052,6 +1969,16 @@ export default function RoleDashboardPage() {
                     </table>
                   </div>
                 </div>
+              )}
+
+              {/* VIEW 2B: FULL-WIDTH CLIENT INVOICING & OFFICIAL RECEIPTS */}
+              {activeSection === "invoicing" && (
+                <InvoicingLedgerPanel
+                  actorName={user.name}
+                  branchId={activeBranch?.id}
+                  orders={orders}
+                  onNotice={showToast}
+                />
               )}
 
               {/* VIEW 3: FULL-WIDTH TEAM ROSTER */}
@@ -2160,8 +2087,8 @@ export default function RoleDashboardPage() {
                                   }}
                                 >
                                   {sp.shiftStatus === "CLOCKED_IN"
-                                    ? "● Clocked In"
-                                    : "○ Off Shift"}
+                                    ? "Clocked in"
+                                    : "Off shift"}
                                 </div>
                               </td>
                               <td className="mono">
@@ -2299,7 +2226,7 @@ export default function RoleDashboardPage() {
                                       color: "var(--muted)",
                                     }}
                                   >
-                                    {item.sku} · Batch {item.batchLot}
+                                    {item.sku}, Batch {item.batchLot}
                                   </span>
                                 </th>
                                 <td>
@@ -2391,6 +2318,16 @@ export default function RoleDashboardPage() {
         order={selectedOrder}
         open={ticketOpen}
         onClose={() => setTicketOpen(false)}
+      />
+
+      <InvoiceDocumentModal
+        invoice={quickInvoiceDoc}
+        open={Boolean(quickInvoiceDoc)}
+        onClose={() => setQuickInvoiceDoc(null)}
+        onRecordPayment={() => {
+          setQuickInvoiceDoc(null);
+          setActiveSection("invoicing");
+        }}
       />
 
       {/* CREATE PRODUCTION ORDER MODAL */}

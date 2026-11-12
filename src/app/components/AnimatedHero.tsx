@@ -324,10 +324,7 @@ export default function AnimatedHero() {
                   </div>
 
                   <div className="hero-fs-telemetry-pill meta-sep-list">
-                    <span>
-                      <span className="status-dot" />{" "}
-                      <span className="mono">{slide.facility}</span>
-                    </span>
+                    <span className="mono">{slide.facility}</span>
                     <span>{slide.leadRole}</span>
                     <strong className="mono">{slide.telemetryMetric}</strong>
                   </div>

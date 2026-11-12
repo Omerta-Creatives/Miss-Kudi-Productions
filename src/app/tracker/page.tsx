@@ -2,20 +2,32 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ACCESS_TIER_LABELS,
   appendAuditLog,
   ARTISAN_ROLE_LABELS,
   ArtisanStaff,
+  buildInvoiceFromOrder,
+  canManageFactory,
+  clearCurrentSessionUser,
+  ClientInvoice,
+  FactoryBranch,
+  getActiveBranchId,
   getCurrentSessionUser,
   INITIAL_ARTISANS,
-  isSuperAdminUser,
+  loadBranches,
+  loadInvoices,
   loadOrders,
   ProductionOrder,
   ProductionStage,
+  saveInvoices,
   saveOrders,
+  setActiveBranchId,
   STAGE_METADATA,
 } from "../lib/production-os";
+import { ConsoleSidebar } from "../components/ConsoleSidebar";
+import { InvoiceDocumentModal } from "../components/InvoiceReceiptModal";
 import { ProductionJobTicketModal } from "../components/ProductionJobTicketModal";
 import { UiIcon } from "../components/UiIcon";
 
@@ -28,19 +40,32 @@ const STAGE_ORDER: ProductionStage[] = [
 ];
 
 export default function ProductionTrackerPage() {
+  const router = useRouter();
   const [user, setUser] = useState<ArtisanStaff>(INITIAL_ARTISANS[0]);
+  const [branches, setBranches] = useState<FactoryBranch[]>([]);
+  const [activeBranchId, setBranchId] = useState<string>(() =>
+    getActiveBranchId()
+  );
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("ALL");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<ProductionOrder | null>(
     null
   );
   const [ticketOpen, setTicketOpen] = useState(false);
+  const [quickInvoiceDoc, setQuickInvoiceDoc] = useState<ClientInvoice | null>(
+    null
+  );
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const syncState = () => {
       setUser(getCurrentSessionUser());
+      setBranches(loadBranches());
+      setBranchId(getActiveBranchId());
       setOrders(loadOrders());
     };
     syncState();
@@ -53,9 +78,11 @@ export default function ProductionTrackerPage() {
       }
       window.addEventListener("mkp:session-change", syncState);
       window.addEventListener("mkp:branch-change", syncState);
+      window.addEventListener("mkp:billing-change", syncState);
       return () => {
         window.removeEventListener("mkp:session-change", syncState);
         window.removeEventListener("mkp:branch-change", syncState);
+        window.removeEventListener("mkp:billing-change", syncState);
       };
     }
   }, []);
@@ -63,6 +90,52 @@ export default function ProductionTrackerPage() {
   const showNotice = (msg: string) => {
     setNotice(msg);
     setTimeout(() => setNotice(null), 4000);
+  };
+
+  const handleToggleSidebar = () => {
+    if (typeof window !== "undefined" && window.innerWidth <= 1080) {
+      setMobileSidebarOpen((prev) => !prev);
+    } else {
+      setSidebarCollapsed((prev) => !prev);
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Clear local session regardless
+    } finally {
+      clearCurrentSessionUser();
+      setSigningOut(false);
+      router.push("/login?signedOut=1");
+      router.refresh();
+    }
+  };
+
+  const handleOpenOrCreateOrderInvoice = (ord: ProductionOrder) => {
+    const currentInvoices = loadInvoices();
+    const existing = currentInvoices.find((inv) => inv.jobCode === ord.jobCode);
+    if (existing) {
+      setQuickInvoiceDoc(existing);
+      return;
+    }
+    const created = buildInvoiceFromOrder(ord);
+    const next = [created, ...currentInvoices];
+    saveInvoices(next);
+    appendAuditLog({
+      action: "finance.invoice_issued",
+      actor: user.name,
+      role: ACCESS_TIER_LABELS[user.accessTier],
+      targetRef: created.invoiceNumber,
+      summary: `Generated commercial invoice ${created.invoiceNumber} from tracker order ${ord.jobCode} (${ord.company}).`,
+    });
+    setQuickInvoiceDoc(created);
+    showNotice(
+      `Generated commercial invoice ${created.invoiceNumber} for ${ord.company}.`
+    );
   };
 
   const handleAdvanceStage = (order: ProductionOrder) => {
@@ -150,276 +223,374 @@ export default function ProductionTrackerPage() {
     return matchesStage && matchesQuery;
   });
 
-  const isSuper = isSuperAdminUser(user);
+  const isManager = canManageFactory(user);
+
+  const sidebarItems = [
+    {
+      id: "ALL",
+      label: "All Runs",
+      icon: "compass" as const,
+      badge: orders.length,
+      active: stageFilter === "ALL",
+      onSelect: () => setStageFilter("ALL"),
+    },
+    ...STAGE_ORDER.map((st) => {
+      const meta = STAGE_METADATA[st];
+      return {
+        id: st,
+        label: `${meta.stepNumber}. ${meta.shortLabel}`,
+        icon: "layers" as const,
+        badge: orders.filter((o) => o.stage === st).length,
+        active: stageFilter === st,
+        onSelect: () => setStageFilter(st),
+      };
+    }),
+  ];
 
   return (
     <main>
-      <section className="section-wrap" style={{ paddingTop: 48, paddingBottom: 96 }}>
-        <div className="tracker-operator-bar">
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span className="mkp-badge mkp-badge-olive">
-              In-house production tracker
-            </span>
-            <span style={{ fontSize: 12, fontWeight: 600 }}>
-              Active Operator: <strong>{user.name}</strong> ({ACCESS_TIER_LABELS[user.accessTier]},{" "}
-              {ARTISAN_ROLE_LABELS[user.role]})
-            </span>
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link
-              href="/dashboard"
-              className="button button-light"
-              style={{ minHeight: 36, padding: "0 12px", border: "1px solid var(--line)" }}
-            >
-              Plant Console
-            </Link>
-            <Link
-              href="/workspace"
-              className="button button-light"
-              style={{ minHeight: 36, padding: "0 12px", border: "1px solid var(--line)" }}
-            >
-              <UiIcon name="settings" size={14} /> Workspace
-            </Link>
-            {isSuper && (
-              <Link
-                href="/superadmin"
-                className="button button-dark"
-                style={{ minHeight: 36, padding: "0 12px" }}
+      <div
+        className={`dashboard-shell ${
+          sidebarCollapsed ? "sidebar-collapsed" : ""
+        }`}
+      >
+        <ConsoleSidebar
+          user={user}
+          groupLabel="Pipeline Stages"
+          items={sidebarItems}
+          branches={branches}
+          activeBranchId={activeBranchId}
+          onBranchChange={(nextId) => setActiveBranchId(nextId)}
+          collapsed={sidebarCollapsed}
+          mobileOpen={mobileSidebarOpen}
+          onCloseMobile={() => setMobileSidebarOpen(false)}
+          onSignOut={handleSignOut}
+          signingOut={signingOut}
+        />
+
+        <section className="dashboard-main">
+          <header className="dashboard-page-header">
+            <div className="dashboard-page-header-left">
+              <button
+                type="button"
+                className="sidebar-toggle-btn"
+                aria-label="Toggle studio navigation sidebar"
+                aria-expanded={!sidebarCollapsed}
+                onClick={handleToggleSidebar}
               >
-                <UiIcon name="star" size={14} /> Superadmin HQ
-              </Link>
-            )}
-          </div>
-        </div>
-
-        <div className="section-heading" style={{ marginBottom: 28 }}>
-          <div>
-            <h2>
-              Manage &amp; track runs from Pattern Studio to Dispatch.
-            </h2>
-          </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <Link
-              className="button button-light"
-              href="/workspace"
-              style={{ border: "1px solid var(--line)" }}
-            >
-              <UiIcon name="settings" size={14} /> Workspace
-            </Link>
-            <Link className="button button-dark" href="/dashboard">
-              Station Console
-            </Link>
-          </div>
-        </div>
-
-        {notice && (
-          <div
-            role="status"
-            className="mkp-banner mkp-banner-olive"
-            style={{ marginBottom: 20 }}
-          >
-            <span>{notice}</span>
-          </div>
-        )}
-
-        <div className="tracker-toolbar">
-          <input
-            type="search"
-            className="tracker-search-input"
-            placeholder="Search by Job Code (e.g. MKP-20261018-841), Brand Name, Pattern Designer, Tailor or QC..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          <div className="tracker-stage-pills" role="tablist" aria-label="Filter by production stage">
-            <button
-              type="button"
-              className={`mkp-filter-pill ${stageFilter === "ALL" ? "active" : ""}`}
-              onClick={() => setStageFilter("ALL")}
-            >
-              All Runs ({orders.length})
-            </button>
-            {STAGE_ORDER.map((st) => {
-              const meta = STAGE_METADATA[st];
-              const count = orders.filter((o) => o.stage === st).length;
-              return (
-                <button
-                  key={st}
-                  type="button"
-                  className={`mkp-filter-pill ${stageFilter === st ? "active" : ""}`}
-                  onClick={() => setStageFilter(st)}
-                >
-                  {meta.stepNumber}. {meta.shortLabel} ({count})
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="tracker-cards-stack">
-          {filtered.length === 0 ? (
-            <div className="mkp-empty-card">
-              <h3>No active production runs in tracker</h3>
-              <p>
-                Create a new production run from your Plant Console, Workspace, or Quote intake to
-                track live 5-stage progress here.
-              </p>
-              <div style={{ marginTop: 14, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-                <Link href="/dashboard" className="button button-dark">
-                  Plant Console
-                </Link>
-                <Link href="/workspace" className="button button-light" style={{ border: "1px solid var(--line)" }}>
-                  <UiIcon name="settings" size={14} /> Workspace
-                </Link>
+                <UiIcon name="menu" size={16} />
+              </button>
+              <div>
+                <h1 className="dashboard-page-title">
+                  Live Order &amp; Floor Tracker
+                </h1>
+                <p className="dashboard-page-subtitle">
+                  Track runs from Pattern Studio through AQL 2.5 Quality Control
+                  and Dispatch
+                </p>
               </div>
             </div>
-          ) : (
-            filtered.map((order) => {
-              const currentIdx = STAGE_ORDER.indexOf(order.stage);
-              const canAdvance = currentIdx >= 0 && currentIdx < STAGE_ORDER.length - 1;
-              const nextStageMeta = canAdvance
-                ? STAGE_METADATA[STAGE_ORDER[currentIdx + 1]]
-                : null;
-              const sewPct = Math.min(
-                100,
-                Math.round((order.unitsSewn / Math.max(1, order.exactQuantity)) * 100)
-              );
-              const qcYield =
-                order.unitsSewn > 0
-                  ? ((order.unitsPassedQc / order.unitsSewn) * 100).toFixed(1)
-                  : "100.0";
 
-              return (
-                <article key={order.jobCode} className="tracker-order-card">
-                  <div className="tracker-card-top">
-                    <div>
-                      <h3 style={{ margin: "0 0 8px", fontSize: 20 }}>
-                        {order.company}: {order.garmentCategory} (
-                        {order.exactQuantity.toLocaleString()} pcs)
-                      </h3>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
-                        <span className="mono tracker-job-code">{order.jobCode}</span>
-                        <span className="mkp-badge mkp-badge-olive">
-                          Stage {STAGE_METADATA[order.stage].stepNumber}:{" "}
-                          {STAGE_METADATA[order.stage].shortLabel}
-                        </span>
-                        <span style={{ fontSize: 11, color: "var(--muted)" }}>
-                          Target Delivery: <strong>{order.targetDeliveryDate}</strong>
-                        </span>
+            <div className="dashboard-page-actions">
+              {isManager && (
+                <Link
+                  className="button button-light"
+                  href="/workspace?tab=invoicing"
+                  style={{ minHeight: 40 }}
+                >
+                  <UiIcon name="receipt" size={14} /> Invoicing &amp; Receipts
+                </Link>
+              )}
+              <Link
+                className="button button-dark"
+                href="/dashboard"
+                style={{ minHeight: 40 }}
+              >
+                Plant Console
+              </Link>
+            </div>
+          </header>
+
+          {notice && (
+            <div
+              role="status"
+              className="mkp-banner mkp-banner-olive"
+              style={{ marginBottom: 20 }}
+            >
+              <span>{notice}</span>
+            </div>
+          )}
+
+          <div className="tracker-toolbar">
+            <input
+              type="search"
+              className="tracker-search-input"
+              placeholder="Search by Job Code (e.g. MKP-20261018-841), Brand Name, Pattern Designer, Tailor or QC..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <div
+              className="tracker-stage-pills"
+              role="tablist"
+              aria-label="Filter by production stage"
+            >
+              <button
+                type="button"
+                className={`mkp-filter-pill ${
+                  stageFilter === "ALL" ? "active" : ""
+                }`}
+                onClick={() => setStageFilter("ALL")}
+              >
+                All Runs ({orders.length})
+              </button>
+              {STAGE_ORDER.map((st) => {
+                const meta = STAGE_METADATA[st];
+                const count = orders.filter((o) => o.stage === st).length;
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    className={`mkp-filter-pill ${
+                      stageFilter === st ? "active" : ""
+                    }`}
+                    onClick={() => setStageFilter(st)}
+                  >
+                    {meta.stepNumber}. {meta.shortLabel} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="tracker-cards-stack">
+            {filtered.length === 0 ? (
+              <div className="mkp-empty-card">
+                <h3>No active production runs in tracker</h3>
+                <p>
+                  Create a new production run from your Plant Console,
+                  Workspace, or Quote intake to track live 5-stage progress
+                  here.
+                </p>
+                <div
+                  style={{
+                    marginTop: 14,
+                    display: "flex",
+                    gap: 10,
+                    justifyContent: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <Link href="/dashboard" className="button button-dark">
+                    Plant Console
+                  </Link>
+                  <Link href="/workspace" className="button button-light">
+                    <UiIcon name="briefcase" size={14} /> Operations &amp; P&amp;L
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              filtered.map((order) => {
+                const currentIdx = STAGE_ORDER.indexOf(order.stage);
+                const canAdvance =
+                  currentIdx >= 0 && currentIdx < STAGE_ORDER.length - 1;
+                const nextStageMeta = canAdvance
+                  ? STAGE_METADATA[STAGE_ORDER[currentIdx + 1]]
+                  : null;
+                const sewPct = Math.min(
+                  100,
+                  Math.round(
+                    (order.unitsSewn / Math.max(1, order.exactQuantity)) * 100
+                  )
+                );
+                const qcYield =
+                  order.unitsSewn > 0
+                    ? ((order.unitsPassedQc / order.unitsSewn) * 100).toFixed(1)
+                    : "100.0";
+
+                return (
+                  <article key={order.jobCode} className="tracker-order-card">
+                    <div className="tracker-card-top">
+                      <div>
+                        <h3 style={{ margin: "0 0 8px", fontSize: 20 }}>
+                          {order.company}: {order.garmentCategory} (
+                          {order.exactQuantity.toLocaleString()} pcs)
+                        </h3>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            flexWrap: "wrap",
+                            marginBottom: 6,
+                          }}
+                        >
+                          <span className="mono tracker-job-code">
+                            {order.jobCode}
+                          </span>
+                          <span className="mkp-badge mkp-badge-olive">
+                            Stage {STAGE_METADATA[order.stage].stepNumber}:{" "}
+                            {STAGE_METADATA[order.stage].shortLabel}
+                          </span>
+                          <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                            Target Delivery:{" "}
+                            <strong>{order.targetDeliveryDate}</strong>
+                          </span>
+                        </div>
+                        <p
+                          className="mkp-muted-text"
+                          style={{ margin: 0, fontSize: 12, maxWidth: 780 }}
+                        >
+                          {order.details}
+                        </p>
                       </div>
-                      <p className="mkp-muted-text" style={{ margin: 0, fontSize: 12, maxWidth: 780 }}>
-                        {order.details}
-                      </p>
-                    </div>
 
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                      {order.unitsSewn < order.exactQuantity && (
-                        <button
-                          type="button"
-                          className="button button-light"
-                          style={{
-                            minHeight: 38,
-                            padding: "0 12px",
-                            border: "1px solid var(--line)",
-                          }}
-                          onClick={() => handleIncrementUnits(order, 25)}
-                        >
-                          +25 Sewn Units
-                        </button>
-                      )}
-                      {canAdvance && nextStageMeta && (
-                        <button
-                          type="button"
-                          className="button button-light"
-                          style={{
-                            minHeight: 38,
-                            padding: "0 12px",
-                            border: "1px solid var(--ink)",
-                            color: "var(--ink)",
-                          }}
-                          onClick={() => handleAdvanceStage(order)}
-                        >
-                          Advance Stage
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="button button-dark"
-                        style={{ minHeight: 38, padding: "0 14px" }}
-                        onClick={() => {
-                          setSelectedOrder(order);
-                          setTicketOpen(true);
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          flexWrap: "wrap",
+                          alignItems: "center",
                         }}
                       >
-                        <UiIcon name="print" size={14} /> Job Ticket
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="pipeline-stepper">
-                    {STAGE_ORDER.map((st, idx) => {
-                      const meta = STAGE_METADATA[st];
-                      const done = idx < currentIdx;
-                      const active = idx === currentIdx;
-                      return (
-                        <div
-                          key={st}
-                          className={`pipeline-step ${done ? "done" : ""} ${
-                            active ? "active" : ""
-                          }`}
+                        {order.unitsSewn < order.exactQuantity && (
+                          <button
+                            type="button"
+                            className="button button-light"
+                            style={{ minHeight: 38, padding: "0 12px" }}
+                            onClick={() => handleIncrementUnits(order, 25)}
+                          >
+                            +25 Sewn Units
+                          </button>
+                        )}
+                        {canAdvance && nextStageMeta && (
+                          <button
+                            type="button"
+                            className="button button-light"
+                            style={{ minHeight: 38, padding: "0 12px" }}
+                            onClick={() => handleAdvanceStage(order)}
+                          >
+                            Advance Stage
+                          </button>
+                        )}
+                        {isManager && (
+                          <button
+                            type="button"
+                            className="button button-light"
+                            style={{ minHeight: 38, padding: "0 12px" }}
+                            onClick={() =>
+                              handleOpenOrCreateOrderInvoice(order)
+                            }
+                          >
+                            <UiIcon name="receipt" size={14} /> Invoice
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="button button-dark"
+                          style={{ minHeight: 38, padding: "0 14px" }}
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            setTicketOpen(true);
+                          }}
                         >
-                          <div className="pipeline-step-num">
-                            {done ? "✓" : meta.stepNumber}
-                          </div>
-                          <div className="pipeline-step-title">{meta.shortLabel}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                          <UiIcon name="print" size={14} /> Job Ticket
+                        </button>
+                      </div>
+                    </div>
 
-                  <div className="tracker-telemetry-grid">
-                    <div className="telemetry-box">
-                      <span className="ticket-label">Pattern designer</span>
-                      <strong>{order.assignedPatternDesigner}</strong>
-                      <small>Input: {order.specificationsReady}</small>
+                    <div className="pipeline-stepper">
+                      {STAGE_ORDER.map((st, idx) => {
+                        const meta = STAGE_METADATA[st];
+                        const done = idx < currentIdx;
+                        const active = idx === currentIdx;
+                        return (
+                          <div
+                            key={st}
+                            className={`pipeline-step ${done ? "done" : ""} ${
+                              active ? "active" : ""
+                            }`}
+                          >
+                            <div className="pipeline-step-num">
+                              {done ? (
+                                <UiIcon name="check" size={12} />
+                              ) : (
+                                meta.stepNumber
+                              )}
+                            </div>
+                            <div className="pipeline-step-title">
+                              {meta.shortLabel}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="telemetry-box">
-                      <span className="ticket-label">Master tailor / sewing lead</span>
-                      <strong>{order.assignedTailorLead}</strong>
-                      <small>
-                        Sewn: {order.unitsSewn.toLocaleString()} /{" "}
-                        {order.exactQuantity.toLocaleString()} pcs ({sewPct}%)
-                      </small>
+
+                    <div className="tracker-telemetry-grid">
+                      <div className="telemetry-box">
+                        <span className="ticket-label">Pattern designer</span>
+                        <strong>{order.assignedPatternDesigner}</strong>
+                        <small>Input: {order.specificationsReady}</small>
+                      </div>
+                      <div className="telemetry-box">
+                        <span className="ticket-label">
+                          Master tailor / sewing lead
+                        </span>
+                        <strong>{order.assignedTailorLead}</strong>
+                        <small>
+                          Sewn: {order.unitsSewn.toLocaleString()} /{" "}
+                          {order.exactQuantity.toLocaleString()} pcs ({sewPct}%)
+                        </small>
+                      </div>
+                      <div className="telemetry-box">
+                        <span className="ticket-label">
+                          Quality control (QC)
+                        </span>
+                        <strong>{order.assignedQcInspector}</strong>
+                        <small>
+                          Passed QC: {order.unitsPassedQc.toLocaleString()} pcs
+                          ({qcYield}% Yield
+                          {order.unitsRework > 0
+                            ? `, ${order.unitsRework} rework`
+                            : ""}
+                          )
+                        </small>
+                      </div>
+                      <div className="telemetry-box">
+                        <span className="ticket-label">
+                          Fabric &amp; pro-forma value
+                        </span>
+                        <strong className="mono">
+                          ₦{order.totalQuoteNgn.toLocaleString()}
+                        </strong>
+                        <small>
+                          {order.estimatedFabricMeters.toLocaleString()}m
+                          allocated, ₦
+                          {order.estimatedUnitCostNgn.toLocaleString()}/pc
+                        </small>
+                      </div>
                     </div>
-                    <div className="telemetry-box">
-                      <span className="ticket-label">Quality control (QC)</span>
-                      <strong>{order.assignedQcInspector}</strong>
-                      <small>
-                        Passed QC: {order.unitsPassedQc.toLocaleString()} pcs ({qcYield}% Yield
-                        {order.unitsRework > 0 ? `, ${order.unitsRework} rework` : ""})
-                      </small>
-                    </div>
-                    <div className="telemetry-box">
-                      <span className="ticket-label">Fabric &amp; pro-forma value</span>
-                      <strong className="mono">
-                        ₦{order.totalQuoteNgn.toLocaleString()}
-                      </strong>
-                      <small>
-                        {order.estimatedFabricMeters.toLocaleString()}m allocated,{" "}
-                        ₦{order.estimatedUnitCostNgn.toLocaleString()}/pc
-                      </small>
-                    </div>
-                  </div>
-                </article>
-              );
-            })
-          )}
-        </div>
-      </section>
+                  </article>
+                );
+              })
+            )}
+          </div>
+        </section>
+      </div>
 
       <ProductionJobTicketModal
         order={selectedOrder}
         open={ticketOpen}
         onClose={() => setTicketOpen(false)}
+      />
+
+      <InvoiceDocumentModal
+        invoice={quickInvoiceDoc}
+        open={Boolean(quickInvoiceDoc)}
+        onClose={() => setQuickInvoiceDoc(null)}
+        onRecordPayment={() => {
+          setQuickInvoiceDoc(null);
+          router.push("/workspace?tab=invoicing");
+        }}
       />
     </main>
   );

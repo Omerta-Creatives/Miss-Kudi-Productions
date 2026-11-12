@@ -155,6 +155,67 @@ export interface AuditLogEntry {
   createdAt: string;
 }
 
+export type InvoiceStatus = "draft" | "issued" | "part_paid" | "paid";
+
+export type PaymentMethod =
+  | "Bank Transfer"
+  | "Corporate Card"
+  | "POS Terminal"
+  | "Cash Deposit";
+
+export interface InvoiceLineItem {
+  id: string;
+  description: string;
+  sizeSpec?: string;
+  quantity: number;
+  unitPriceNgn: number;
+  lineTotalNgn: number;
+}
+
+export interface ClientInvoice {
+  id: string;
+  invoiceNumber: string;
+  jobCode?: string;
+  branchId?: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone?: string;
+  clientAddress?: string;
+  issueDate: string;
+  dueDate: string;
+  items: InvoiceLineItem[];
+  subtotalNgn: number;
+  discountPercent: number;
+  discountAmountNgn: number;
+  vatPercent: number;
+  vatAmountNgn: number;
+  totalAmountNgn: number;
+  amountPaidNgn: number;
+  balanceDueNgn: number;
+  status: InvoiceStatus;
+  paymentTerms: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentReceipt {
+  id: string;
+  receiptNumber: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  jobCode?: string;
+  clientName: string;
+  clientEmail: string;
+  amountPaidNgn: number;
+  balanceAfterNgn: number;
+  paymentMethod: PaymentMethod;
+  paymentReference: string;
+  receivedBy: string;
+  paidAt: string;
+  notes?: string;
+}
+
 export const STAGE_METADATA: Record<
   ProductionStage,
   { stepNumber: string; label: string; shortLabel: string; description: string }
@@ -281,7 +342,7 @@ export const INITIAL_ARTISANS: ArtisanStaff[] = [
     branchId: "br-yaba",
     branchName: "Yaba Flagship Production Plant",
     specialty: "Founder, Global Superadmin & Multi-Facility Operations",
-    station: "Executive HQ · Lagos",
+    station: "Executive HQ, Lagos",
     activeRuns: 0,
     unitsCompletedMonth: 0,
     qcPassRate: 100,
@@ -317,6 +378,10 @@ export const INITIAL_EXPENSES: FactoryExpense[] = [];
 export const INITIAL_POS: SupplierPurchaseOrder[] = [];
 
 export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [];
+
+export const INITIAL_INVOICES: ClientInvoice[] = [];
+
+export const INITIAL_RECEIPTS: PaymentReceipt[] = [];
 
 // Category pricing & fabric consumption baselines
 export const GARMENT_ESTIMATION_SPECS: Record<
@@ -490,6 +555,8 @@ const STORAGE_KEYS = {
   POS: "mkp_nexus_pos_v5",
   CLIENTS: "mkp_nexus_clients_v5",
   EXPENSES: "mkp_nexus_expenses_v5",
+  INVOICES: "mkp_nexus_invoices_v5",
+  RECEIPTS: "mkp_nexus_receipts_v5",
   AUDIT: "mkp_nexus_audit_v5",
   DRAFT_SIZE_MATRIX: "mkp_nexus_draft_sizes_v5",
   CURRENT_USER: "mkp_nexus_session_user_v5",
@@ -887,4 +954,240 @@ export function appendAuditLog(entry: Omit<AuditLogEntry, "id" | "createdAt">) {
     localStorage.setItem(STORAGE_KEYS.AUDIT, JSON.stringify(next));
   }
   return next;
+}
+
+export function loadInvoices(): ClientInvoice[] {
+  if (typeof window === "undefined") return INITIAL_INVOICES;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.INVOICES);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(INITIAL_INVOICES));
+      return INITIAL_INVOICES;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return INITIAL_INVOICES;
+  }
+}
+
+export function saveInvoices(list: ClientInvoice[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(list));
+  window.dispatchEvent(new CustomEvent("mkp:billing-change"));
+}
+
+export function loadReceipts(): PaymentReceipt[] {
+  if (typeof window === "undefined") return INITIAL_RECEIPTS;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.RECEIPTS);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.RECEIPTS, JSON.stringify(INITIAL_RECEIPTS));
+      return INITIAL_RECEIPTS;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return INITIAL_RECEIPTS;
+  }
+}
+
+export function saveReceipts(list: PaymentReceipt[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEYS.RECEIPTS, JSON.stringify(list));
+  window.dispatchEvent(new CustomEvent("mkp:billing-change"));
+}
+
+export function computeInvoiceTotals(
+  items: InvoiceLineItem[],
+  discountPercent: number,
+  vatPercent: number,
+  amountPaidNgn = 0
+) {
+  const normalizedItems = items.map((item) => {
+    const qty = Math.max(1, Number(item.quantity) || 1);
+    const rate = Math.max(0, Number(item.unitPriceNgn) || 0);
+    return {
+      ...item,
+      quantity: qty,
+      unitPriceNgn: rate,
+      lineTotalNgn: Math.round(qty * rate),
+    };
+  });
+  const subtotalNgn = normalizedItems.reduce((sum, i) => sum + i.lineTotalNgn, 0);
+  const discPct = Math.min(50, Math.max(0, Number(discountPercent) || 0));
+  const discountAmountNgn = Math.round(subtotalNgn * (discPct / 100));
+  const netAfterDiscount = Math.max(0, subtotalNgn - discountAmountNgn);
+  const vatPct = Math.max(0, Number(vatPercent) || 0);
+  const vatAmountNgn = Math.round(netAfterDiscount * (vatPct / 100));
+  const totalAmountNgn = netAfterDiscount + vatAmountNgn;
+  const paid = Math.min(totalAmountNgn, Math.max(0, Math.round(amountPaidNgn)));
+  const balanceDueNgn = Math.max(0, totalAmountNgn - paid);
+  const status: InvoiceStatus =
+    totalAmountNgn > 0 && balanceDueNgn === 0
+      ? "paid"
+      : paid > 0
+      ? "part_paid"
+      : "issued";
+
+  return {
+    items: normalizedItems,
+    subtotalNgn,
+    discountPercent: discPct,
+    discountAmountNgn,
+    vatPercent: vatPct,
+    vatAmountNgn,
+    totalAmountNgn,
+    amountPaidNgn: paid,
+    balanceDueNgn,
+    status,
+  };
+}
+
+export function generateInvoiceNumber(): string {
+  const dateStamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const rand = Math.floor(100 + Math.random() * 900);
+  return `INV-MKP-${dateStamp}-${rand}`;
+}
+
+export function generateReceiptNumber(): string {
+  const dateStamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const rand = Math.floor(100 + Math.random() * 900);
+  return `RCP-MKP-${dateStamp}-${rand}`;
+}
+
+export function buildInvoiceFromOrder(
+  order: ProductionOrder,
+  options?: { vatPercent?: number; dueDays?: number }
+): ClientInvoice {
+  const now = new Date();
+  const issueDate = now.toISOString().slice(0, 10);
+  const dueDays = options?.dueDays ?? 14;
+  const dueDate = new Date(now.getTime() + dueDays * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  const vatPercent = options?.vatPercent ?? 0;
+
+  const sizeSummary = (["XS", "S", "M", "L", "XL", "XXL"] as const)
+    .filter((sz) => (order.sizeBreakdown?.[sz] || 0) > 0)
+    .map((sz) => `${sz}: ${order.sizeBreakdown[sz]}`)
+    .join(", ");
+
+  const rawItems: InvoiceLineItem[] = [
+    {
+      id: `itm-${Date.now()}-1`,
+      description: `${order.garmentCategory} bulk production (${order.specificationsReady})`,
+      sizeSpec: sizeSummary || "Graded XS to XXL run",
+      quantity: order.exactQuantity,
+      unitPriceNgn: order.estimatedUnitCostNgn,
+      lineTotalNgn: order.exactQuantity * order.estimatedUnitCostNgn,
+    },
+  ];
+
+  // Note: order.estimatedUnitCostNgn already incorporates volume discount, so invoice discountPercent = 0 to match order.totalQuoteNgn accurately.
+  const totals = computeInvoiceTotals(rawItems, 0, vatPercent, 0);
+
+  return {
+    id: `inv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    invoiceNumber: generateInvoiceNumber(),
+    jobCode: order.jobCode,
+    branchId: order.branchId,
+    clientName: order.company,
+    clientEmail: order.email,
+    clientPhone: order.phone,
+    clientAddress: "Lagos, Nigeria",
+    issueDate,
+    dueDate,
+    ...totals,
+    paymentTerms:
+      "60% deposit required prior to bulk fabric cutting; 40% balance due upon AQL 2.5 quality sign-off and prior to dispatch.",
+    notes: `Linked to Job Code ${order.jobCode} (${order.estimatedFabricMeters.toLocaleString()}m estimated fabric allocation).`,
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+  };
+}
+
+export function recordInvoicePayment(params: {
+  invoiceId: string;
+  amountNgn: number;
+  paymentMethod: PaymentMethod;
+  paymentReference?: string;
+  receivedBy: string;
+  notes?: string;
+}): {
+  invoices: ClientInvoice[];
+  receipts: PaymentReceipt[];
+  updatedInvoice: ClientInvoice | null;
+  receipt: PaymentReceipt | null;
+} {
+  const currentInvoices = loadInvoices();
+  const currentReceipts = loadReceipts();
+  const target = currentInvoices.find((inv) => inv.id === params.invoiceId);
+  if (!target) {
+    return {
+      invoices: currentInvoices,
+      receipts: currentReceipts,
+      updatedInvoice: null,
+      receipt: null,
+    };
+  }
+
+  const cleanAmount = Math.min(
+    target.balanceDueNgn,
+    Math.max(1, Math.round(Number(params.amountNgn) || 0))
+  );
+  const nextPaid = target.amountPaidNgn + cleanAmount;
+  const recomputed = computeInvoiceTotals(
+    target.items,
+    target.discountPercent,
+    target.vatPercent,
+    nextPaid
+  );
+
+  const nowIso = new Date().toISOString();
+  const updatedInvoice: ClientInvoice = {
+    ...target,
+    ...recomputed,
+    updatedAt: nowIso,
+  };
+
+  const nextInvoices = currentInvoices.map((inv) =>
+    inv.id === updatedInvoice.id ? updatedInvoice : inv
+  );
+  saveInvoices(nextInvoices);
+
+  const receipt: PaymentReceipt = {
+    id: `rcp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    receiptNumber: generateReceiptNumber(),
+    invoiceId: updatedInvoice.id,
+    invoiceNumber: updatedInvoice.invoiceNumber,
+    jobCode: updatedInvoice.jobCode,
+    clientName: updatedInvoice.clientName,
+    clientEmail: updatedInvoice.clientEmail,
+    amountPaidNgn: cleanAmount,
+    balanceAfterNgn: updatedInvoice.balanceDueNgn,
+    paymentMethod: params.paymentMethod,
+    paymentReference:
+      params.paymentReference?.trim() ||
+      `TRF-${Date.now().toString().slice(-6)}`,
+    receivedBy: params.receivedBy,
+    paidAt: nowIso,
+    notes: params.notes?.trim() || undefined,
+  };
+
+  const nextReceipts = [receipt, ...currentReceipts];
+  saveReceipts(nextReceipts);
+
+  appendAuditLog({
+    action: "finance.payment_received",
+    actor: params.receivedBy,
+    role: "Accounts & Production Desk",
+    targetRef: receipt.receiptNumber,
+    summary: `Issued official receipt ${receipt.receiptNumber} for ₦${cleanAmount.toLocaleString()} against ${updatedInvoice.invoiceNumber} (${updatedInvoice.clientName}).`,
+  });
+
+  return {
+    invoices: nextInvoices,
+    receipts: nextReceipts,
+    updatedInvoice,
+    receipt,
+  };
 }

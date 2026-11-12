@@ -214,6 +214,7 @@ export default function SiteHeader() {
               <Link
                 key={link.href}
                 href={link.href}
+                aria-current={active ? "page" : undefined}
                 className={active ? "active-nav-link" : ""}
               >
                 {link.label}
@@ -228,7 +229,6 @@ export default function SiteHeader() {
               <>
                 <div className="header-session-cluster desktop-cta">
                   <span className="header-user-pill">
-                    <span className="status-dot" aria-hidden="true" />
                     <span>{user.name}</span>
                     <small className="mono">{ACCESS_TIER_LABELS[user.accessTier]}</small>
                   </span>

@@ -224,7 +224,7 @@ export default function Home() {
             <Link className="button button-light" href="/process">
               5-Stage Workflow
             </Link>
-            <Link className="button hero-fs-btn-glass" href="/quote">
+            <Link className="button button-dark" href="/quote">
               Configure Quote
             </Link>
           </div>
@@ -389,10 +389,10 @@ export default function Home() {
               </div>
 
               <div className="home-quote-cta-actions">
-                <Link className="button hero-fs-btn-gold" href="/quote">
+                <Link className="button button-dark" href="/quote">
                   Open Quote Studio
                 </Link>
-                <Link className="button hero-fs-btn-glass" href="/size-charts">
+                <Link className="button button-light" href="/size-charts">
                   Size Calculator
                 </Link>
               </div>

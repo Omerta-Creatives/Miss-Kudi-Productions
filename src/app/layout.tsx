@@ -1,9 +1,9 @@
 import "./globals.css";
-import Link from "next/link";
 import SiteHeader from "./components/SiteHeader";
+import SiteFooter from "./components/SiteFooter";
 
 export const metadata = {
-  title: "Miss Kudi Productions · B2B Garment Manufacturing in Surulere, Lagos",
+  title: "Miss Kudi Productions, B2B Garment Manufacturing in Surulere, Lagos",
   description:
     "Surulere, Lagos B2B garment manufacturing partner for fashion brands at 1 Alawode Street, Surulere. Bulk cut-and-sew, private-label production, CAD pattern grading, and AQL 2.5 quality control.",
   icons: {
@@ -20,41 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div id="main-content" tabIndex={-1}>
           {children}
         </div>
-        <footer className="footer no-print">
-          <div className="footer-top">
-            <Link href="/" className="wordmark wordmark-footer" aria-label="Miss Kudi Productions Home">
-              <img
-                src="/images/mk-logo-light.png"
-                alt="Miss Kudi Productions · Surulere, Lagos Atelier"
-                width={76}
-                height={76}
-                className="wordmark-logo-img"
-                style={{ width: 76, height: 76 }}
-              />
-            </Link>
-            <p>
-              Your designs. Our expertise.
-              <br />
-              Production at scale.
-            </p>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <Link className="button button-light" href="/size-charts">
-                Size &amp; Grading
-              </Link>
-              <Link className="button button-light" href="/services">
-                Capabilities
-              </Link>
-              <Link className="button button-light" href="/quote">
-                Production Inquiry
-              </Link>
-            </div>
-          </div>
-          <div className="footer-bottom">
-            <span>© {new Date().getFullYear()} Miss Kudi Productions</span>
-            <span>1 Alawode Street, Surulere, Lagos, Nigeria</span>
-            <span>B2B garment manufacturing</span>
-          </div>
-        </footer>
+        <SiteFooter />
       </body>
     </html>
   );

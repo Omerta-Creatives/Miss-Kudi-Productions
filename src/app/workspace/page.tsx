@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   appendAuditLog,
   ARTISAN_ROLE_LABELS,
@@ -9,13 +10,22 @@ import {
   ArtisanStaff,
   AuditLogEntry,
   BrandClientCrm,
+  buildInvoiceFromOrder,
+  clearCurrentSessionUser,
+  ClientInvoice,
   FabricInventoryItem,
+  FactoryBranch,
   FactoryExpense,
+  getActiveBranchId,
+  getCurrentSessionUser,
+  INITIAL_ARTISANS,
   loadArtisans,
   loadAuditLogs,
+  loadBranches,
   loadBrandClients,
   loadExpenses,
   loadInventory,
+  loadInvoices,
   loadOrders,
   loadPurchaseOrders,
   ProductionOrder,
@@ -25,9 +35,11 @@ import {
   saveBrandClients,
   saveExpenses,
   saveInventory,
+  saveInvoices,
   saveLocalPasswordHash,
   saveOrders,
   savePurchaseOrders,
+  setActiveBranchId,
   STAGE_METADATA,
   SupplierPurchaseOrder,
   UserAccessTier,
@@ -36,6 +48,9 @@ import {
   ModalDialog,
   ProductionJobTicketModal,
 } from "../components/ProductionJobTicketModal";
+import { ConsoleSidebar } from "../components/ConsoleSidebar";
+import { InvoicingLedgerPanel } from "../components/InvoicingLedgerPanel";
+import { InvoiceDocumentModal } from "../components/InvoiceReceiptModal";
 import { UiIcon } from "../components/UiIcon";
 
 type WorkspaceTab =
@@ -43,9 +58,18 @@ type WorkspaceTab =
   | "artisans"
   | "inventory"
   | "crm"
+  | "invoicing"
   | "finance";
 
 export default function FactoryWorkspacePage() {
+  const router = useRouter();
+  const [user, setUser] = useState<ArtisanStaff>(INITIAL_ARTISANS[0]);
+  const [branches, setBranches] = useState<FactoryBranch[]>([]);
+  const [activeBranchIdState, setActiveBranchIdState] = useState<string>("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("pipeline");
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
   const [artisans, setArtisans] = useState<ArtisanStaff[]>([]);
@@ -55,6 +79,7 @@ export default function FactoryWorkspacePage() {
   );
   const [clients, setClients] = useState<BrandClientCrm[]>([]);
   const [expenses, setExpenses] = useState<FactoryExpense[]>([]);
+  const [invoices, setInvoices] = useState<ClientInvoice[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [notice, setNotice] = useState<string>("");
 
@@ -62,6 +87,8 @@ export default function FactoryWorkspacePage() {
   const [selectedTicketOrder, setSelectedTicketOrder] =
     useState<ProductionOrder | null>(null);
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
+  const [quickInvoiceDoc, setQuickInvoiceDoc] =
+    useState<ClientInvoice | null>(null);
   const [artisanModalOpen, setArtisanModalOpen] = useState(false);
   const [zReportModalOpen, setZReportModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ProductionOrder | null>(
@@ -105,18 +132,98 @@ export default function FactoryWorkspacePage() {
   });
 
   useEffect(() => {
-    setOrders(loadOrders());
-    setArtisans(loadArtisans());
-    setInventory(loadInventory());
-    setPurchaseOrders(loadPurchaseOrders());
-    setClients(loadBrandClients());
-    setExpenses(loadExpenses());
-    setAuditLogs(loadAuditLogs());
+    const syncWorkspace = () => {
+      setUser(getCurrentSessionUser());
+      setBranches(loadBranches());
+      setActiveBranchIdState(getActiveBranchId());
+      setOrders(loadOrders());
+      setArtisans(loadArtisans());
+      setInventory(loadInventory());
+      setPurchaseOrders(loadPurchaseOrders());
+      setClients(loadBrandClients());
+      setExpenses(loadExpenses());
+      setInvoices(loadInvoices());
+      setAuditLogs(loadAuditLogs());
+    };
+    syncWorkspace();
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab") as WorkspaceTab | null;
+      if (
+        tabParam &&
+        [
+          "pipeline",
+          "artisans",
+          "inventory",
+          "crm",
+          "invoicing",
+          "finance",
+        ].includes(tabParam)
+      ) {
+        setActiveTab(tabParam);
+      }
+      window.addEventListener("mkp:session-change", syncWorkspace);
+      window.addEventListener("mkp:branch-change", syncWorkspace);
+      window.addEventListener("mkp:billing-change", syncWorkspace);
+      return () => {
+        window.removeEventListener("mkp:session-change", syncWorkspace);
+        window.removeEventListener("mkp:branch-change", syncWorkspace);
+        window.removeEventListener("mkp:billing-change", syncWorkspace);
+      };
+    }
   }, []);
 
   const showToast = (msg: string) => {
     setNotice(msg);
     setTimeout(() => setNotice(""), 5000);
+  };
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Clear local session regardless
+    } finally {
+      clearCurrentSessionUser();
+      setSigningOut(false);
+      router.push("/login?signedOut=1");
+      router.refresh();
+    }
+  };
+
+  const handleToggleSidebar = () => {
+    if (typeof window !== "undefined" && window.innerWidth <= 1080) {
+      setMobileSidebarOpen((prev) => !prev);
+    } else {
+      setSidebarCollapsed((prev) => !prev);
+    }
+  };
+
+  const handleOpenOrCreateOrderInvoice = (order: ProductionOrder) => {
+    const existing = invoices.find((inv) => inv.jobCode === order.jobCode);
+    if (existing) {
+      setQuickInvoiceDoc(existing);
+      return;
+    }
+    const created = buildInvoiceFromOrder(order);
+    const next = [created, ...invoices];
+    setInvoices(next);
+    saveInvoices(next);
+    const logs = appendAuditLog({
+      action: "finance.invoice_issued",
+      actor: user.name,
+      role: ARTISAN_ROLE_LABELS[user.role],
+      targetRef: created.invoiceNumber,
+      summary: `Generated commercial invoice ${created.invoiceNumber} from order ${order.jobCode} (${order.company}).`,
+    });
+    setAuditLogs(logs);
+    setQuickInvoiceDoc(created);
+    showToast(
+      `Generated commercial invoice ${created.invoiceNumber} for ${order.company}.`
+    );
   };
 
   // --- Pipeline & QC Handlers ---
@@ -594,36 +701,119 @@ export default function FactoryWorkspacePage() {
   const tailors = artisans.filter((a) => a.role === "tailor");
   const qcInspectors = artisans.filter((a) => a.role === "quality_control");
 
+  const workspaceNavItems = [
+    {
+      id: "pipeline",
+      label: "Floor & QC",
+      icon: "layers" as const,
+      badge: orders.length,
+      active: activeTab === "pipeline",
+      onSelect: () => setActiveTab("pipeline"),
+    },
+    {
+      id: "invoicing",
+      label: "Invoicing & Receipts",
+      icon: "receipt" as const,
+      badge: invoices.length,
+      active: activeTab === "invoicing",
+      onSelect: () => setActiveTab("invoicing"),
+    },
+    {
+      id: "artisans",
+      label: "Team Roster",
+      icon: "users" as const,
+      badge: artisans.length,
+      active: activeTab === "artisans",
+      onSelect: () => setActiveTab("artisans"),
+    },
+    {
+      id: "inventory",
+      label: "Materials & POs",
+      icon: "box" as const,
+      badge: inventory.length,
+      active: activeTab === "inventory",
+      onSelect: () => setActiveTab("inventory"),
+    },
+    {
+      id: "crm",
+      label: "Brand Partners",
+      icon: "briefcase" as const,
+      badge: clients.length,
+      active: activeTab === "crm",
+      onSelect: () => setActiveTab("crm"),
+    },
+    {
+      id: "finance",
+      label: "P&L Ledger",
+      icon: "ledger" as const,
+      active: activeTab === "finance",
+      onSelect: () => setActiveTab("finance"),
+    },
+  ];
+
   return (
     <main>
-      <section
-        className="section-wrap"
-        style={{ paddingTop: 52, paddingBottom: 96 }}
+      <div
+        className={`dashboard-shell ${
+          sidebarCollapsed ? "sidebar-collapsed" : ""
+        }`}
       >
-        {/* Top Workspace Header */}
-        <div className="section-heading" style={{ marginBottom: 24 }}>
-          <div>
-            <h2>Artisan Floor, Fabric Runway &amp; Plant P&amp;L.</h2>
-          </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              className="button button-light"
-              style={{ minHeight: 40, border: "1px solid var(--line)" }}
-              onClick={() => setZReportModalOpen(true)}
-            >
-              <UiIcon name="print" size={14} /> Daily Summary
-            </button>
-            <button
-              type="button"
-              className="button button-dark"
-              style={{ minHeight: 40 }}
-              onClick={handleExportAccountingCsv}
-            >
-              Export P&amp;L Sheet
-            </button>
-          </div>
-        </div>
+        <ConsoleSidebar
+          user={user}
+          groupLabel="Operations Modules"
+          items={workspaceNavItems}
+          branches={branches}
+          activeBranchId={activeBranchIdState}
+          onBranchChange={(id) => {
+            setActiveBranchId(id);
+            setActiveBranchIdState(id);
+          }}
+          collapsed={sidebarCollapsed}
+          mobileOpen={mobileSidebarOpen}
+          onCloseMobile={() => setMobileSidebarOpen(false)}
+          onSignOut={handleSignOut}
+          signingOut={signingOut}
+        />
+
+        <section className="dashboard-main">
+          {/* Top Workspace Header */}
+          <header className="dashboard-page-header">
+            <div className="dashboard-page-header-left">
+              <button
+                type="button"
+                className="sidebar-toggle-btn"
+                aria-label="Toggle studio sidebar"
+                onClick={handleToggleSidebar}
+              >
+                <UiIcon name="menu" size={16} />
+              </button>
+              <div>
+                <h1 className="dashboard-page-title">
+                  Artisan Floor, Invoicing &amp; Plant P&amp;L
+                </h1>
+                <p className="dashboard-page-subtitle">
+                  Production runs, client invoices, official receipts, fabric
+                  runway, and Lagos operating ledger
+                </p>
+              </div>
+            </div>
+            <div className="dashboard-page-actions">
+              <button
+                type="button"
+                className="button button-light"
+                onClick={() => setZReportModalOpen(true)}
+              >
+                <UiIcon name="print" size={14} /> Daily Summary
+              </button>
+              <button
+                type="button"
+                className="button button-dark"
+                onClick={handleExportAccountingCsv}
+              >
+                Export P&amp;L Sheet
+              </button>
+            </div>
+          </header>
 
         {notice && (
           <div className="mkp-banner mkp-banner-olive" style={{ marginBottom: 20 }}>
@@ -639,7 +829,7 @@ export default function FactoryWorkspacePage() {
               ₦{grossRevenueNgn.toLocaleString()}
             </div>
             <div className="kpi-sub">
-              {orders.length} active runs ·{" "}
+              {orders.length} active runs,{" "}
               {totalUnitsInPipeline.toLocaleString()} total garments
             </div>
           </div>
@@ -697,13 +887,24 @@ export default function FactoryWorkspacePage() {
           <button
             type="button"
             role="tab"
+            aria-selected={activeTab === "invoicing"}
+            className={`workspace-tab-btn ${
+              activeTab === "invoicing" ? "active" : ""
+            }`}
+            onClick={() => setActiveTab("invoicing")}
+          >
+            02. Invoicing ({invoices.length})
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={activeTab === "artisans"}
             className={`workspace-tab-btn ${
               activeTab === "artisans" ? "active" : ""
             }`}
             onClick={() => setActiveTab("artisans")}
           >
-            02. Team Roster ({artisans.length})
+            03. Team Roster ({artisans.length})
           </button>
           <button
             type="button"
@@ -714,7 +915,7 @@ export default function FactoryWorkspacePage() {
             }`}
             onClick={() => setActiveTab("inventory")}
           >
-            03. Materials ({inventory.length})
+            04. Materials ({inventory.length})
           </button>
           <button
             type="button"
@@ -725,7 +926,7 @@ export default function FactoryWorkspacePage() {
             }`}
             onClick={() => setActiveTab("crm")}
           >
-            04. Brand Partners ({clients.length})
+            05. Brand Partners ({clients.length})
           </button>
           <button
             type="button"
@@ -736,9 +937,19 @@ export default function FactoryWorkspacePage() {
             }`}
             onClick={() => setActiveTab("finance")}
           >
-            05. P&amp;L Ledger
+            06. P&amp;L Ledger
           </button>
         </div>
+
+        {/* TAB: INVOICING & OFFICIAL RECEIPTS */}
+        {activeTab === "invoicing" && (
+          <InvoicingLedgerPanel
+            actorName={user.name}
+            branchId={activeBranchIdState || undefined}
+            orders={orders}
+            onNotice={showToast}
+          />
+        )}
 
         {/* TAB 1: PRODUCTION FLOOR & QC CONSOLE */}
         {activeTab === "pipeline" && (
@@ -748,8 +959,8 @@ export default function FactoryWorkspacePage() {
                 <h3>Active Production Orders &amp; Artisan Line Assignment</h3>
                 <p>
                   Assign Pattern Designers, Master Tailors, and Quality Control
-                  Inspectors to each run, log sewn batches, and print 80mm/A4
-                  Job Tickets.
+                  Inspectors to each run, log sewn batches, and print Job
+                  Tickets or Commercial Invoices.
                 </p>
               </div>
               <Link className="button button-dark" href="/quote" style={{ minHeight: 40 }}>
@@ -757,6 +968,28 @@ export default function FactoryWorkspacePage() {
               </Link>
             </div>
 
+            {orders.length === 0 ? (
+              <div className="console-empty-state">
+                <h4>No active production orders yet</h4>
+                <p>
+                  Configure a garment run in the Quote Studio or Plant Console
+                  to assign floor leads, track sewn units, and issue client
+                  invoices.
+                </p>
+                <div className="panel-filter-bar">
+                  <Link className="button button-dark" href="/quote">
+                    + New Production Order
+                  </Link>
+                  <button
+                    type="button"
+                    className="button button-light"
+                    onClick={() => setActiveTab("invoicing")}
+                  >
+                    <UiIcon name="receipt" size={14} /> Open Invoicing
+                  </button>
+                </div>
+              </div>
+            ) : (
             <div
               className="table-scroll-wrap"
               tabIndex={0}
@@ -791,8 +1024,8 @@ export default function FactoryWorkspacePage() {
                       <td>
                         <div>{order.garmentCategory}</div>
                         <div className="mono" style={{ fontSize: 11 }}>
-                          <strong>{order.exactQuantity.toLocaleString()} pcs</strong>{" "}
-                          · ₦{order.totalQuoteNgn.toLocaleString()}
+                          <strong>{order.exactQuantity.toLocaleString()} pcs</strong>
+                          , ₦{order.totalQuoteNgn.toLocaleString()}
                         </div>
                       </td>
                       <td>
@@ -907,6 +1140,13 @@ export default function FactoryWorkspacePage() {
                           <button
                             type="button"
                             className="mkp-inline-btn"
+                            onClick={() => handleOpenOrCreateOrderInvoice(order)}
+                          >
+                            <UiIcon name="receipt" size={13} /> Invoice
+                          </button>
+                          <button
+                            type="button"
+                            className="mkp-inline-btn"
                             onClick={() => {
                               setSelectedTicketOrder(order);
                               setTicketModalOpen(true);
@@ -928,6 +1168,7 @@ export default function FactoryWorkspacePage() {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
 
@@ -1047,6 +1288,19 @@ export default function FactoryWorkspacePage() {
               </div>
             </div>
 
+            {inventory.length === 0 ? (
+              <div className="console-empty-state">
+                <h4>No fabric or trim SKUs stocked yet</h4>
+                <p>
+                  Add textile rolls, interlinings, or woven label inventory from
+                  the Plant Console to monitor daily cutting runway and issue
+                  supplier Purchase Orders.
+                </p>
+                <Link className="button button-dark" href="/dashboard">
+                  Manage Materials in Plant Console
+                </Link>
+              </div>
+            ) : (
             <div
               className="table-scroll-wrap"
               tabIndex={0}
@@ -1087,7 +1341,7 @@ export default function FactoryWorkspacePage() {
                         <td>
                           <strong>{item.name}</strong>
                           <div style={{ fontSize: 10, color: "var(--muted)" }}>
-                            {item.category} · ₦
+                            {item.category}, ₦
                             {item.costPerUnitNgn.toLocaleString()}/{item.unit}
                           </div>
                         </td>
@@ -1150,11 +1404,17 @@ export default function FactoryWorkspacePage() {
                 </tbody>
               </table>
             </div>
+            )}
 
             {/* Issued Purchase Orders */}
             <h4 style={{ marginTop: 32, marginBottom: 12 }}>
               Supplier Purchase Orders (Textile Mills &amp; Trim Vendors)
             </h4>
+            {purchaseOrders.length === 0 ? (
+              <div className="console-empty-state">
+                <p>No supplier purchase orders issued yet.</p>
+              </div>
+            ) : (
             <div
               className="table-scroll-wrap"
               tabIndex={0}
@@ -1215,6 +1475,7 @@ export default function FactoryWorkspacePage() {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
 
@@ -1248,6 +1509,15 @@ export default function FactoryWorkspacePage() {
               ))}
             </div>
 
+            {clients.length === 0 ? (
+              <div className="console-empty-state" style={{ marginTop: 20 }}>
+                <h4>No B2B brand partners registered yet</h4>
+                <p>
+                  Register your fashion brand partners below to track lifetime
+                  garment volume and contract discount tiers.
+                </p>
+              </div>
+            ) : (
             <div
               className="table-scroll-wrap"
               tabIndex={0}
@@ -1320,6 +1590,7 @@ export default function FactoryWorkspacePage() {
                 </tbody>
               </table>
             </div>
+            )}
 
             <form
               onSubmit={handleAddBrandClient}
@@ -1452,6 +1723,11 @@ export default function FactoryWorkspacePage() {
               </button>
             </form>
 
+            {expenses.length === 0 ? (
+              <div className="console-empty-state">
+                <p>No operating expenses recorded yet.</p>
+              </div>
+            ) : (
             <div
               className="table-scroll-wrap"
               tabIndex={0}
@@ -1499,10 +1775,16 @@ export default function FactoryWorkspacePage() {
                 </tbody>
               </table>
             </div>
+            )}
 
             <h4 style={{ marginTop: 36, marginBottom: 12 }}>
               Factory &amp; Quality Activity Log
             </h4>
+            {auditLogs.length === 0 ? (
+              <div className="console-empty-state">
+                <p>No floor or accounting activity logged yet.</p>
+              </div>
+            ) : (
             <div
               className="table-scroll-wrap"
               tabIndex={0}
@@ -1541,15 +1823,27 @@ export default function FactoryWorkspacePage() {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
-      </section>
+        </section>
+      </div>
 
       {/* Printable Job Ticket Modal */}
       <ProductionJobTicketModal
         order={selectedTicketOrder}
         open={ticketModalOpen}
         onClose={() => setTicketModalOpen(false)}
+      />
+
+      <InvoiceDocumentModal
+        invoice={quickInvoiceDoc}
+        open={Boolean(quickInvoiceDoc)}
+        onClose={() => setQuickInvoiceDoc(null)}
+        onRecordPayment={() => {
+          setQuickInvoiceDoc(null);
+          setActiveTab("invoicing");
+        }}
       />
 
       {/* Onboard New Superadmin / Admin / Artisan Modal */}

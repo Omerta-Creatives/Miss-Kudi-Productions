@@ -10,6 +10,7 @@ import {
   ArtisanStaff,
   AuditLogEntry,
   clearCurrentSessionUser,
+  ClientInvoice,
   FactoryBranch,
   getCurrentSessionUser,
   isSuperAdminUser,
@@ -17,6 +18,7 @@ import {
   loadAuditLogs,
   loadBranches,
   loadExpenses,
+  loadInvoices,
   loadOrders,
   saveArtisans,
   saveBranches,
@@ -26,9 +28,16 @@ import {
   UserAccessTier,
 } from "../lib/production-os";
 import { ModalDialog } from "../components/ProductionJobTicketModal";
+import { ConsoleSidebar } from "../components/ConsoleSidebar";
+import { InvoicingLedgerPanel } from "../components/InvoicingLedgerPanel";
 import { UiIcon } from "../components/UiIcon";
 
-type SuperadminSection = "overview" | "accounts" | "facilities" | "audit";
+type SuperadminSection =
+  | "overview"
+  | "accounts"
+  | "facilities"
+  | "invoicing"
+  | "audit";
 
 export default function SuperadminHqPage() {
   const router = useRouter();
@@ -38,6 +47,7 @@ export default function SuperadminHqPage() {
   const [branches, setBranches] = useState<FactoryBranch[]>([]);
   const [artisans, setArtisans] = useState<ArtisanStaff[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [invoices, setInvoices] = useState<ClientInvoice[]>([]);
   const [ordersCount, setOrdersCount] = useState(0);
   const [globalGmv, setGlobalGmv] = useState(0);
   const [globalOpEx, setGlobalOpEx] = useState(0);
@@ -48,6 +58,7 @@ export default function SuperadminHqPage() {
   const [activeSection, setActiveSection] =
     useState<SuperadminSection>("overview");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -83,7 +94,7 @@ export default function SuperadminHqPage() {
     accessTier: "admin" as UserAccessTier,
     role: "production_manager" as ArtisanRole,
     branchId: "BR-LOS-YABA",
-    station: "Executive HQ · Lagos",
+    station: "Executive HQ, Lagos",
     specialty: "Multi-Facility Operations & Production Governance",
     shiftStatus: "CLOCKED_IN" as ArtisanStaff["shiftStatus"],
   });
@@ -97,6 +108,7 @@ export default function SuperadminHqPage() {
     setBranches(b);
     setArtisans(a);
     setAuditLogs(loadAuditLogs());
+    setInvoices(loadInvoices());
     setOrdersCount(o.length);
     setGlobalGmv(o.reduce((sum, item) => sum + item.totalQuoteNgn, 0));
     setGlobalOpEx(e.reduce((sum, item) => sum + item.amountNgn, 0));
@@ -105,8 +117,20 @@ export default function SuperadminHqPage() {
   useEffect(() => {
     refreshData();
     window.addEventListener("mkp:session-change", refreshData);
-    return () => window.removeEventListener("mkp:session-change", refreshData);
+    window.addEventListener("mkp:billing-change", refreshData);
+    return () => {
+      window.removeEventListener("mkp:session-change", refreshData);
+      window.removeEventListener("mkp:billing-change", refreshData);
+    };
   }, []);
+
+  const handleToggleSidebar = () => {
+    if (typeof window !== "undefined" && window.innerWidth <= 1080) {
+      setMobileSidebarOpen((prev) => !prev);
+    } else {
+      setSidebarCollapsed((prev) => !prev);
+    }
+  };
 
   const showNotice = (msg: string) => {
     setNotice(msg);
@@ -135,9 +159,9 @@ export default function SuperadminHqPage() {
         : "tailor";
     const defaultStation =
       presetTier === "superadmin"
-        ? "Executive HQ · Lagos"
+        ? "Executive HQ, Lagos"
         : presetTier === "admin"
-        ? "Plant Planning Office · Yaba"
+        ? "Plant Planning Office, Surulere"
         : "Sewing Line 1";
     const defaultSpecialty =
       presetTier === "superadmin"
@@ -361,7 +385,7 @@ export default function SuperadminHqPage() {
       });
       setAuditLogs(logs);
       showNotice(
-        `Updated ${target.name} (${target.accessTier.toUpperCase()} · ${
+        `Updated ${target.name} (${target.accessTier.toUpperCase()}, ${
           ARTISAN_ROLE_LABELS[target.role]
         }).`
       );
@@ -504,7 +528,7 @@ export default function SuperadminHqPage() {
         targetRef: updatedRecord.email,
         summary: `Edited ${updatedRecord.accessTier.toUpperCase()} profile for ${updatedRecord.name} (${
           ARTISAN_ROLE_LABELS[updatedRecord.role]
-        } · ${updatedRecord.station})${
+        }, ${updatedRecord.station})${
           nextPassword ? " and rotated login password" : ""
         }.`,
       });
@@ -513,7 +537,7 @@ export default function SuperadminHqPage() {
       setEditingStaff(null);
       showNotice(
         `Saved updates for ${updatedRecord.name}${
-          nextPassword ? " · password rotated" : ""
+          nextPassword ? ", password rotated" : ""
         }.`
       );
     } finally {
@@ -644,13 +668,6 @@ export default function SuperadminHqPage() {
     );
   });
 
-  const userInitials = currentUser.name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
   const sectionHeadingMeta: Record<
     SuperadminSection,
     { title: string; subtitle: string }
@@ -667,11 +684,57 @@ export default function SuperadminHqPage() {
       title: "Lagos Facilities",
       subtitle: `Production plants, machine capacity, fabric stock, and branch profitability`,
     },
+    invoicing: {
+      title: "Global Invoicing & Receipts",
+      subtitle: `Consolidated client invoices, deposits, and official payment receipts across all Lagos plants`,
+    },
     audit: {
       title: "Security & Audit Log",
       subtitle: `Verified log of role updates, facility changes, and floor quality sign-offs`,
     },
   };
+
+  const sidebarItems = [
+    {
+      id: "overview",
+      label: "Executive Summary",
+      icon: "grid" as const,
+      active: activeSection === "overview",
+      onSelect: () => setActiveSection("overview"),
+    },
+    {
+      id: "accounts",
+      label: "Team & Access",
+      icon: "users" as const,
+      badge: artisans.length,
+      active: activeSection === "accounts",
+      onSelect: () => setActiveSection("accounts"),
+    },
+    {
+      id: "facilities",
+      label: "Facilities",
+      icon: "building" as const,
+      badge: branches.length,
+      active: activeSection === "facilities",
+      onSelect: () => setActiveSection("facilities"),
+    },
+    {
+      id: "invoicing",
+      label: "Invoicing & Receipts",
+      icon: "receipt" as const,
+      badge: invoices.length,
+      active: activeSection === "invoicing",
+      onSelect: () => setActiveSection("invoicing"),
+    },
+    {
+      id: "audit",
+      label: "Audit Log",
+      icon: "shield" as const,
+      badge: auditLogs.length,
+      active: activeSection === "audit",
+      onSelect: () => setActiveSection("audit"),
+    },
+  ];
 
   return (
     <main>
@@ -680,136 +743,19 @@ export default function SuperadminHqPage() {
           sidebarCollapsed ? "sidebar-collapsed" : ""
         }`}
       >
-        {/* CALM SUPERADMIN SIDEBAR */}
-        <aside
-          className="dashboard-sidebar"
-          aria-label="Superadmin HQ Navigation"
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {/* Identity Card */}
-            <div className="sidebar-identity-card">
-              <div className="sidebar-identity-top">
-                <span className="sidebar-avatar" aria-hidden="true">
-                  {userInitials}
-                </span>
-                <div className="sidebar-identity-meta">
-                  <div className="sidebar-user-name">{currentUser.name}</div>
-                  <div className="sidebar-user-email">{currentUser.email}</div>
-                </div>
-              </div>
-              <div className="sidebar-identity-status">
-                <span className="mkp-badge mkp-badge-olive">
-                  SUPERADMIN HQ ★
-                </span>
-                <span
-                  className="mono"
-                  style={{ fontSize: 10, color: "var(--muted)" }}
-                >
-                  All Plants · Lagos
-                </span>
-              </div>
-            </div>
-
-            {/* Clean 4-Item HQ Modules */}
-            <nav aria-label="Superadmin HQ Modules">
-              <div className="sidebar-section-label">EXECUTIVE HQ</div>
-              <ul className="sidebar-nav-list">
-                <li>
-                  <button
-                    type="button"
-                    className={`sidebar-nav-btn ${
-                      activeSection === "overview" ? "active" : ""
-                    }`}
-                    onClick={() => setActiveSection("overview")}
-                  >
-                    <span className="sidebar-nav-btn-label">
-                      <span className="sidebar-nav-icon" aria-hidden="true">
-                        ◈
-                      </span>
-                      <span>Executive Summary</span>
-                    </span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    className={`sidebar-nav-btn ${
-                      activeSection === "accounts" ? "active" : ""
-                    }`}
-                    onClick={() => setActiveSection("accounts")}
-                  >
-                    <span className="sidebar-nav-btn-label">
-                      <span className="sidebar-nav-icon" aria-hidden="true">
-                        ⊞
-                      </span>
-                      <span>Team &amp; Access</span>
-                    </span>
-                    <span className="sidebar-nav-badge">{artisans.length}</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    className={`sidebar-nav-btn ${
-                      activeSection === "facilities" ? "active" : ""
-                    }`}
-                    onClick={() => setActiveSection("facilities")}
-                  >
-                    <span className="sidebar-nav-btn-label">
-                      <span className="sidebar-nav-icon" aria-hidden="true">
-                        ⌂
-                      </span>
-                      <span>Facilities</span>
-                    </span>
-                    <span className="sidebar-nav-badge">{branches.length}</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    className={`sidebar-nav-btn ${
-                      activeSection === "audit" ? "active" : ""
-                    }`}
-                    onClick={() => setActiveSection("audit")}
-                  >
-                    <span className="sidebar-nav-btn-label">
-                      <span className="sidebar-nav-icon" aria-hidden="true">
-                        ⛨
-                      </span>
-                      <span>Audit Log</span>
-                    </span>
-                    <span className="sidebar-nav-badge">{auditLogs.length}</span>
-                  </button>
-                </li>
-              </ul>
-            </nav>
-          </div>
-
-          {/* Clean Session & Account Footer */}
-          <div className="sidebar-footer-card">
-            <div className="sidebar-section-label" style={{ marginTop: 0 }}>
-              Session
-            </div>
-            <Link className="sidebar-quick-btn" href="/dashboard">
-              <span>Plant Console</span>
-            </Link>
-            <Link
-              className="sidebar-quick-btn"
-              href="/login?mode=change-password"
-            >
-              <span>Change Password</span>
-              <UiIcon name="settings" size={14} />
-            </Link>
-            <button
-              type="button"
-              className="sidebar-quick-btn sidebar-signout-btn"
-              onClick={handleSignOut}
-              disabled={signingOut}
-            >
-              <span>{signingOut ? "Signing out..." : "Sign Out"}</span>
-            </button>
-          </div>
-        </aside>
+        <ConsoleSidebar
+          user={currentUser}
+          groupLabel="Executive HQ"
+          items={sidebarItems}
+          branches={branches}
+          activeBranchId={branches[0]?.id}
+          onBranchChange={(nextId) => handleInspectBranch(nextId)}
+          collapsed={sidebarCollapsed}
+          mobileOpen={mobileSidebarOpen}
+          onCloseMobile={() => setMobileSidebarOpen(false)}
+          onSignOut={handleSignOut}
+          signingOut={signingOut}
+        />
 
         {/* MAIN SUPERADMIN WORKSPACE */}
         <section className="dashboard-main">
@@ -819,11 +765,11 @@ export default function SuperadminHqPage() {
               <button
                 type="button"
                 className="sidebar-toggle-btn"
-                aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+                aria-label="Toggle studio navigation sidebar"
                 aria-expanded={!sidebarCollapsed}
-                onClick={() => setSidebarCollapsed((prev) => !prev)}
+                onClick={handleToggleSidebar}
               >
-                <span aria-hidden="true">☰</span>
+                <UiIcon name="menu" size={16} />
               </button>
               <div>
                 <h1 className="dashboard-page-title">
@@ -844,6 +790,15 @@ export default function SuperadminHqPage() {
                   onClick={() => setBranchModalOpen(true)}
                 >
                   + Add Facility
+                </button>
+              ) : activeSection === "invoicing" ? (
+                <button
+                  type="button"
+                  className="button button-light"
+                  style={{ minHeight: 40 }}
+                  onClick={() => setActiveSection("overview")}
+                >
+                  Executive Summary
                 </button>
               ) : (
                 <button
@@ -1356,9 +1311,9 @@ export default function SuperadminHqPage() {
                               style={{ fontSize: 10.5, color: "var(--muted)" }}
                             >
                               {u.shiftStatus === "CLOCKED_IN"
-                                ? "● Clocked In"
-                                : "○ Off Shift"}{" "}
-                              · {u.qcPassRate.toFixed(1)}% QC
+                                ? "Clocked in"
+                                : "Off shift"}
+                              , {u.qcPassRate.toFixed(1)}% QC
                             </div>
                           </td>
                           <td>
@@ -1461,7 +1416,7 @@ export default function SuperadminHqPage() {
                             </div>
                           </td>
                           <td className="mono">
-                            <strong>{br.machineCount} machines</strong> ·{" "}
+                            <strong>{br.machineCount} machines</strong>,{" "}
                             {staffHere} members
                           </td>
                           <td className="mono">
@@ -1515,6 +1470,14 @@ export default function SuperadminHqPage() {
                 </table>
               </div>
             </div>
+          )}
+
+          {/* ==================== VIEW 3B: GLOBAL INVOICING & RECEIPTS ==================== */}
+          {activeSection === "invoicing" && (
+            <InvoicingLedgerPanel
+              actorName={currentUser.name}
+              onNotice={showNotice}
+            />
           )}
 
           {/* ==================== VIEW 4: FULL-WIDTH AUDIT LOG ==================== */}
@@ -1726,7 +1689,7 @@ export default function SuperadminHqPage() {
               <input
                 name="station"
                 required
-                placeholder="e.g. Executive HQ · Lagos"
+                placeholder="e.g. Executive HQ, Lagos"
                 value={newStaff.station}
                 onChange={(e) =>
                   setNewStaff((p) => ({ ...p, station: e.target.value }))
@@ -2035,12 +1998,8 @@ export default function SuperadminHqPage() {
             <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
               <button
                 type="button"
-                className="button button-dark"
-                style={{
-                  flex: 1,
-                  background: "#9e2a2b",
-                  borderColor: "#9e2a2b",
-                }}
+                className="button mkp-btn-danger"
+                style={{ flex: 1 }}
                 onClick={handleConfirmDeleteStaff}
               >
                 Confirm Remove
@@ -2328,12 +2287,8 @@ export default function SuperadminHqPage() {
             <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
               <button
                 type="button"
-                className="button button-dark"
-                style={{
-                  flex: 1,
-                  background: "#9e2a2b",
-                  borderColor: "#9e2a2b",
-                }}
+                className="button mkp-btn-danger"
+                style={{ flex: 1 }}
                 onClick={handleConfirmDeleteBranch}
               >
                 Confirm Remove
