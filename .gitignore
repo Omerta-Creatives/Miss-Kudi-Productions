@@ -41,11 +41,13 @@ yarn-error.log*
 .fseventsd
 Thumbs.db
 
-# Deployment & tooling caches
+# Deployment, generated video renders & tooling caches
 .vercel
 .turbo
 .eslintcache
 .hallmark/
+/brag-output/
+/brag-output-*/
 
 # Editor, scratch & agent directories
 .idea/
@@ -56,8 +58,12 @@ Thumbs.db
 *~
 *.tmp
 *.bak
+*.sb-*
 /tmp/
 /temp/
 .agent/
+.agents/
 .claude/
+.codex/
+.cursor/
 .gemini/
