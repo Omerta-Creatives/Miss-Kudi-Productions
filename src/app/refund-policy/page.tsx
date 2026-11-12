@@ -6,7 +6,6 @@ export default function RefundPolicy() {
       <section className="policy-section section-wrap" id="refund-policy">
         <div className="section-heading">
           <div>
-            <div className="section-kicker">07 / REFUND POLICY</div>
             <h2>Refund Policy</h2>
           </div>
         </div>

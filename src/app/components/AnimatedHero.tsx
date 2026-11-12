@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { UiIcon } from "./UiIcon";
 
 export interface JourneySlide {
   step: string;
   stageTag: string;
   shortLabel: string;
-  eyebrow: string;
   titleMain: string;
   titleAccent: string;
   description: string;
@@ -24,110 +24,104 @@ export interface JourneySlide {
 const JOURNEY_SLIDES: JourneySlide[] = [
   {
     step: "01",
-    stageTag: "CHAPTER 01 / 06 · ATELIER BRIEF & INTAKE",
+    stageTag: "Chapter 01 of 06: Atelier Brief",
     shortLabel: "Atelier Intake",
-    eyebrow: "A PRODUCTION PARTNER FOR FASHION BRANDS",
     titleMain: "Your designs. Our expertise.",
     titleAccent: "Production at scale.",
     description:
-      "Your collection starts at our timber drafting tables in Surulere. We audit your tech packs, reference garments, target GSM weights, and XS–XXL size ratios to issue an instant Job Code and Bill of Materials.",
-    facility: "1 Alawode St · Surulere Atelier",
+      "Your collection starts at our timber drafting tables in Surulere. We audit your tech packs, reference garments, target GSM weights, and XS to XXL size ratios to issue an instant Job Code and Bill of Materials.",
+    facility: "1 Alawode St, Surulere Atelier",
     leadRole: "Merchandising & Production Desk",
-    telemetryMetric: "Day 1–2 · Instant Job Ticket",
-    deliverableBadge: "MOQ 50 – 5,000+ PCS",
+    telemetryMetric: "Day 1 to 2, Instant Job Ticket",
+    deliverableBadge: "MOQ 50 to 5,000+ pcs",
     image: "/images/hero-lagos-atelier.jpg",
     alt: "Master tailors and pattern designers working at timber drafting tables inside the Miss Kudi Productions garment atelier in Surulere, Lagos",
-    ctaLabel: "Instant Quote & Job Ticket",
+    ctaLabel: "Instant Quote",
     ctaHref: "/quote",
   },
   {
     step: "02",
-    stageTag: "CHAPTER 02 / 06 · CAD PATTERN & GRADING",
+    stageTag: "Chapter 02 of 06: CAD Pattern & Grading",
     shortLabel: "CAD Pattern Studio",
-    eyebrow: "SURULERE CAD PATTERN & GRADING STUDIO",
-    titleMain: "Precision CAD blocks &",
-    titleAccent: "zero-waste XS–XXL grading.",
+    titleMain: "Precision CAD blocks and",
+    titleAccent: "zero-waste XS to XXL grading.",
     description:
-      "Senior Pattern Designers translate your silhouette into digital CAD blocks, grade every point-of-measure across XS–XXL, and craft a first-fit toile sample before a single bulk roll is cut.",
+      "Senior Pattern Designers translate your silhouette into digital CAD blocks, grade every point-of-measure across XS to XXL, and craft a first-fit toile sample before a single bulk roll is cut.",
     facility: "Surulere Pattern & Sample Studio",
     leadRole: "Senior Pattern Designers",
     telemetryMetric: "94.6% Fabric Marker Yield",
-    deliverableBadge: "XS–XXL GRADED SPEC",
+    deliverableBadge: "XS to XXL Graded Spec",
     image: "/images/pattern-cutting-studio.jpg",
     alt: "Nigerian pattern designer inspecting graded CAD garment blocks, brass pattern weights and fabric bolts",
-    ctaLabel: "Size & Ratio Calculator",
+    ctaLabel: "Size Calculator",
     ctaHref: "/size-charts",
   },
   {
     step: "03",
-    stageTag: "CHAPTER 03 / 06 · CUTTING & PRIVATE-LABEL TRIMS",
+    stageTag: "Chapter 03 of 06: Cutting & Trims",
     shortLabel: "Cutting & Trims",
-    eyebrow: "MULTI-PLY CUTTING & BRANDED HARDWARE",
-    titleMain: "24-hour fabric relaxation &",
+    titleMain: "24-hour fabric relaxation and",
     titleAccent: "custom woven damask labels.",
     description:
       "Fabric bolts relax for 24 hours before multi-ply cutting. Every bundle is shade-lot tagged and paired with your brand's custom woven damask neck labels, satin care tags, and YKK hardware.",
     facility: "Surulere Cutting & Trim Vault",
     leadRole: "Cutting Masters & Trim Specialists",
     telemetryMetric: "100% Cut-Panel Inspection",
-    deliverableBadge: "PRIVATE-LABEL READY",
+    deliverableBadge: "Private-Label Ready",
     image: "/images/private-label-finishing.jpg",
     alt: "Macro flat-lay of custom woven Miss Kudi damask neck labels, corozo buttons, spec tags and folded olive and ecru textiles",
-    ctaLabel: "Explore Private-Label Specs",
+    ctaLabel: "Private-Label Specs",
     ctaHref: "/services",
   },
   {
     step: "04",
-    stageTag: "CHAPTER 04 / 06 · INDUSTRIAL SEWING FLOOR",
+    stageTag: "Chapter 04 of 06: Sewing Floor",
     shortLabel: "Bulk Sewing Line",
-    eyebrow: "92+ INDUSTRIAL JUKI & BROTHER STATIONS",
     titleMain: "Balanced cut-and-sew lines",
-    titleAccent: "built for volume & precision.",
+    titleAccent: "built for volume and precision.",
     description:
       "Dedicated industrial sewing lines are balanced specifically to your garment construction. Master Tailors execute consistent stitch-per-inch tension across streetwear, tailoring, and resortwear.",
     facility: "Surulere Bulk Sewing Floor",
     leadRole: "Master Tailor Leads",
     telemetryMetric: "92 Active Sewing Stations",
-    deliverableBadge: "35,500+ PCS / MONTH",
+    deliverableBadge: "35,500+ pcs / month",
     image: "/images/sewing-production-line.jpg",
     alt: "Nigerian master tailors operating industrial lockstitch sewing machines in Surulere, Lagos garment factory floor",
-    ctaLabel: "Inspect 5-Stage Workflow",
+    ctaLabel: "5-Stage Workflow",
     ctaHref: "/process",
   },
   {
     step: "05",
-    stageTag: "CHAPTER 05 / 06 · AQL 2.5 AUDIT & STEAM FINISHING",
+    stageTag: "Chapter 05 of 06: AQL 2.5 Audit",
     shortLabel: "AQL 2.5 Quality Bay",
-    eyebrow: "36-POINT MEASUREMENT & FINISHING BAY",
     titleMain: "Strict AQL 2.5 quality gates",
-    titleAccent: "& vacuum-steam finishing.",
+    titleAccent: "and vacuum-steam finishing.",
     description:
       "Every batch undergoes strict AQL 2.5 inspection on dress forms and measurement tables. Approved garments are thread-trimmed, vacuum-steam pressed, barcode-polybagged, and manifested for dispatch.",
     facility: "Surulere AQL 2.5 Finishing Bay",
     leadRole: "AQL 2.5 QC Inspectors",
     telemetryMetric: "99.4% AQL 2.5 Pass Rate",
-    deliverableBadge: "ISO / AQL 2.5 CERTIFIED",
+    deliverableBadge: "AQL 2.5 Verified",
     image: "/images/qc-finishing-bay.jpg",
     alt: "Quality control inspector measuring tailored olive blazer on a dress form in Surulere, Lagos finishing bay",
-    ctaLabel: "View Quality Standards",
+    ctaLabel: "Quality Standards",
     ctaHref: "/process",
   },
   {
     step: "06",
-    stageTag: "CHAPTER 06 / 06 · SHOWROOM & GLOBAL DISPATCH",
+    stageTag: "Chapter 06 of 06: Global Dispatch",
     shortLabel: "Retail Launch",
-    eyebrow: "3 TO 5 WEEKS TURNAROUND · GLOBAL DISPATCH",
     titleMain: "Retail-ready collections",
     titleAccent: "delivered to your showroom.",
     description:
       "From first pattern block to packed export cartons in 3 to 5 weeks. Your collection arrives pressed, labeled, and ready for flagship retail rails or direct-to-consumer fulfillment worldwide.",
-    facility: "Surulere Hub · Global Dispatch",
+    facility: "Surulere Hub, Global Dispatch",
     leadRole: "Export & Dispatch Desk",
-    telemetryMetric: "3 – 5 Weeks Turnaround",
-    deliverableBadge: "GLOBAL DISPATCH",
+    telemetryMetric: "3 to 5 Weeks Turnaround",
+    deliverableBadge: "Global Dispatch",
     image: "/images/lagos-atelier-lookbook.jpg",
     alt: "Surulere fashion atelier showroom with olive linen blazers and resortwear on brass rail",
-    ctaLabel: "Start Your Production Run",
+    ctaLabel: "Start Production",
     ctaHref: "/quote",
   },
 ];
@@ -139,7 +133,6 @@ export default function AnimatedHero() {
   const filmstripRef = useRef<HTMLDivElement | null>(null);
 
   const totalSlides = JOURNEY_SLIDES.length;
-  const activeSlide = JOURNEY_SLIDES[activeIndex];
 
   const goToSlide = useCallback(
     (index: number) => {
@@ -157,7 +150,6 @@ export default function AnimatedHero() {
     goToSlide(activeIndex - 1);
   }, [activeIndex, goToSlide]);
 
-  // Auto-advance journey every 6s unless paused or reduced-motion is preferred
   useEffect(() => {
     if (isPaused) return;
     if (
@@ -172,7 +164,6 @@ export default function AnimatedHero() {
     return () => window.clearInterval(timer);
   }, [isPaused, totalSlides]);
 
-  // Sync bottom filmstrip active item gently
   useEffect(() => {
     const scroller = filmstripRef.current;
     if (!scroller) return;
@@ -184,7 +175,6 @@ export default function AnimatedHero() {
     scroller.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
   }, [activeIndex]);
 
-  // modern-web-guidance: carousel-slide-effects Web Animations API fallback
   useEffect(() => {
     if (typeof window === "undefined" || typeof CSS === "undefined") return;
     if (
@@ -276,14 +266,14 @@ export default function AnimatedHero() {
   return (
     <section
       className="hero-fs-stage"
-      aria-label="Miss Kudi Productions Fullscreen 3D Production Journey"
+      data-js="ready"
+      aria-label="Miss Kudi Productions Production Journey"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onKeyDown={handleKeyDown}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Fullscreen 3D Perspective Slider Deck */}
       <div className="hero-fs-3d-viewport">
         {JOURNEY_SLIDES.map((slide, idx) => {
           const offset = getRelativeOffset(idx);
@@ -312,7 +302,6 @@ export default function AnimatedHero() {
                 if (!isCenter) goToSlide(idx);
               }}
             >
-              {/* Fullscreen Background Photography */}
               <img
                 src={slide.image}
                 alt={slide.alt}
@@ -325,9 +314,7 @@ export default function AnimatedHero() {
               />
               <div className="hero-fs-backdrop-scrim" aria-hidden="true" />
 
-              {/* Fullscreen Editorial Content Overlay */}
               <div className="hero-fs-content-shell">
-                {/* Top Telemetry Bar Inside Fullscreen Hero */}
                 <div className="hero-fs-topbar">
                   <div className="hero-fs-badges">
                     <span className="hero-fs-chip-primary mono">{slide.stageTag}</span>
@@ -336,33 +323,29 @@ export default function AnimatedHero() {
                     </span>
                   </div>
 
-                  <div className="hero-fs-telemetry-pill">
-                    <span className="status-dot" />
-                    <span className="mono">{slide.facility}</span>
-                    <span aria-hidden="true">·</span>
+                  <div className="hero-fs-telemetry-pill meta-sep-list">
+                    <span>
+                      <span className="status-dot" />{" "}
+                      <span className="mono">{slide.facility}</span>
+                    </span>
                     <span>{slide.leadRole}</span>
-                    <span aria-hidden="true">·</span>
                     <strong className="mono">{slide.telemetryMetric}</strong>
                   </div>
                 </div>
 
-                {/* Main Center Hero Headline & Narrative */}
                 <div className="hero-fs-main-grid">
                   <div className="hero-fs-copy-block">
-                    <p className="hero-fs-eyebrow mono">
-                      <span className="hero-fs-eyebrow-line" /> {slide.eyebrow}
-                    </p>
                     {idx === 0 ? (
                       <h1 className="hero-fs-title">
                         {slide.titleMain}
                         <br />
-                        <em>{slide.titleAccent}</em>
+                        {slide.titleAccent}
                       </h1>
                     ) : (
                       <h2 className="hero-fs-title">
                         {slide.titleMain}
                         <br />
-                        <em>{slide.titleAccent}</em>
+                        {slide.titleAccent}
                       </h2>
                     )}
                     <p className="hero-fs-description">{slide.description}</p>
@@ -373,7 +356,7 @@ export default function AnimatedHero() {
                         className="button hero-fs-btn-gold"
                         tabIndex={isCenter ? 0 : -1}
                       >
-                        {slide.ctaLabel} <span>↗</span>
+                        {slide.ctaLabel}
                       </Link>
                       {activeIndex < totalSlides - 1 ? (
                         <button
@@ -385,8 +368,7 @@ export default function AnimatedHero() {
                             handleNext();
                           }}
                         >
-                          Next Chapter: {JOURNEY_SLIDES[activeIndex + 1].shortLabel}{" "}
-                          <span>→</span>
+                          Next Stage
                         </button>
                       ) : (
                         <a
@@ -394,13 +376,12 @@ export default function AnimatedHero() {
                           className="button hero-fs-btn-glass"
                           tabIndex={isCenter ? 0 : -1}
                         >
-                          Enter Section 01: Manifesto <span>↓</span>
+                          Atelier Overview
                         </a>
                       )}
                     </div>
                   </div>
 
-                  {/* Right Floating 3D Next-Chapter Preview Card */}
                   <div className="hero-fs-next-card-wrap">
                     <div
                       className="hero-fs-next-preview-card"
@@ -415,8 +396,8 @@ export default function AnimatedHero() {
                       }`}
                     >
                       <div className="hero-fs-next-card-head mono">
-                        <span>UP NEXT IN THE JOURNEY</span>
-                        <span>STAGE {JOURNEY_SLIDES[(idx + 1) % totalSlides].step} →</span>
+                        <span>Up next</span>
+                        <span>Stage {JOURNEY_SLIDES[(idx + 1) % totalSlides].step}</span>
                       </div>
                       <div className="hero-fs-next-card-media">
                         <img
@@ -445,12 +426,11 @@ export default function AnimatedHero() {
         })}
       </div>
 
-      {/* Bottom Docked Full-Width Journey Filmstrip & Controls */}
       <div className="hero-fs-bottom-dock">
         <div className="hero-fs-progress-track" aria-hidden="true">
           <div
             className="hero-fs-progress-fill"
-            style={{ width: `${journeyProgressPct}%` }}
+            style={{ transform: `scaleX(${journeyProgressPct / 100})` }}
           />
         </div>
 
@@ -485,7 +465,7 @@ export default function AnimatedHero() {
                     decoding="async"
                   />
                   <div className="hero-fs-step-card-text">
-                    <span className="mono">STAGE {slide.step}</span>
+                    <span className="mono">Stage {slide.step}</span>
                     <strong>{slide.shortLabel}</strong>
                   </div>
                 </button>
@@ -501,7 +481,7 @@ export default function AnimatedHero() {
                 onClick={handlePrev}
                 aria-label="Previous chapter"
               >
-                ←
+                Prev
               </button>
               <button
                 type="button"
@@ -509,7 +489,7 @@ export default function AnimatedHero() {
                 onClick={() => setIsPaused((p) => !p)}
                 aria-label={isPaused ? "Resume autoplay" : "Pause autoplay"}
               >
-                {isPaused ? "▶" : "❚❚"}
+                <UiIcon name={isPaused ? "play" : "pause"} size={14} />
               </button>
               <button
                 type="button"
@@ -517,15 +497,14 @@ export default function AnimatedHero() {
                 onClick={handleNext}
                 aria-label="Next chapter"
               >
-                →
+                Next
               </button>
             </div>
 
             <a href="#about" className="hero-fs-flow-conduit">
               <span className="mono">
-                {journeyProgressPct}% JOURNEY · FLOW TO SECTION 01
+                {journeyProgressPct}% complete, view atelier
               </span>
-              <span className="hero-fs-flow-arrow">↓</span>
             </a>
           </div>
         </div>

@@ -39,20 +39,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </p>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <Link className="button button-light" href="/size-charts">
-                Size &amp; Grading Matrix <span>⊞</span>
+                Size &amp; Grading
               </Link>
               <Link className="button button-light" href="/services">
-                Explore Capabilities <span>✦</span>
+                Capabilities
               </Link>
               <Link className="button button-light" href="/quote">
-                Start a production inquiry <span>↗</span>
+                Production Inquiry
               </Link>
             </div>
           </div>
           <div className="footer-bottom">
             <span>© {new Date().getFullYear()} Miss Kudi Productions</span>
             <span>1 Alawode Street, Surulere, Lagos, Nigeria</span>
-            <span>B2B GARMENT MANUFACTURING</span>
+            <span>B2B garment manufacturing</span>
           </div>
         </footer>
       </body>

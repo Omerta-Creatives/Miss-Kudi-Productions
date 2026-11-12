@@ -16,6 +16,7 @@ import {
   isSuperAdminUser,
   setCurrentSessionUser,
 } from "../lib/production-os";
+import { UiIcon } from "./UiIcon";
 
 export default function SiteHeader() {
   const pathname = usePathname();
@@ -82,7 +83,6 @@ export default function SiteHeader() {
     };
   }, [pathname, isInternalRoute]);
 
-  // modern-web-guidance: light-dismiss-a-dialog for mobile drawer
   useEffect(() => {
     const dialog = drawerRef.current;
     if (!dialog) return;
@@ -178,7 +178,6 @@ export default function SiteHeader() {
         Skip to main content
       </a>
 
-      {/* Unified Single-Row Navigation Header */}
       <header
         className={`site-header no-print ${
           isInternalRoute ? "site-header-internal" : ""
@@ -192,7 +191,7 @@ export default function SiteHeader() {
           >
             <img
               src="/images/mk-logo-transparent.png"
-              alt="Miss Kudi Productions · Surulere, Lagos Atelier"
+              alt="Miss Kudi Productions, Surulere, Lagos Atelier"
               width={64}
               height={64}
               className="wordmark-logo-img"
@@ -231,13 +230,13 @@ export default function SiteHeader() {
                   <span className="header-user-pill">
                     <span className="status-dot" aria-hidden="true" />
                     <span>{user.name}</span>
-                    <small className="mono">{user.accessTier.toUpperCase()}</small>
+                    <small className="mono">{ACCESS_TIER_LABELS[user.accessTier]}</small>
                   </span>
                   <Link
                     className="button button-light internal-exit-btn"
                     href="/"
                   >
-                    Public Site <span>↗</span>
+                    Public Site
                   </Link>
                   <button
                     type="button"
@@ -255,7 +254,7 @@ export default function SiteHeader() {
                   className="button button-light internal-exit-btn"
                   href="/"
                 >
-                  Public Site <span>↗</span>
+                  Public Site
                 </Link>
                 {!pathname.startsWith("/login") && (
                   <Link className="button button-dark header-cta" href="/login">
@@ -272,7 +271,7 @@ export default function SiteHeader() {
                     className="button button-light internal-exit-btn"
                     href={isSuper ? "/superadmin" : "/dashboard"}
                   >
-                    Console <span>→</span>
+                    Console
                   </Link>
                   <button
                     type="button"
@@ -285,7 +284,7 @@ export default function SiteHeader() {
                 </>
               )}
               <Link className="button button-dark header-cta" href="/quote">
-                Request a Quote <span>↗</span>
+                Request Quote
               </Link>
             </div>
           )}
@@ -308,7 +307,6 @@ export default function SiteHeader() {
         </div>
       </header>
 
-      {/* Mobile Navigation Drawer (<dialog closedby="any">) */}
       <dialog
         id="mobile-navigation-drawer"
         ref={drawerRef}
@@ -328,18 +326,10 @@ export default function SiteHeader() {
               className="wordmark-logo-img"
               style={{ width: 48, height: 48 }}
             />
-            <div
-              id={drawerTitleId}
-              style={{
-                fontSize: 10.5,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                color: "var(--muted)",
-              }}
-            >
+            <div id={drawerTitleId} className="mkp-muted-text" style={{ fontSize: 12, fontWeight: 600 }}>
               {authenticated
                 ? ACCESS_TIER_LABELS[user.accessTier]
-                : "SURULERE · LAGOS MANUFACTURING"}
+                : "Surulere, Lagos Atelier"}
             </div>
           </div>
           <button
@@ -348,15 +338,14 @@ export default function SiteHeader() {
             aria-label="Close navigation menu"
             onClick={() => setDrawerOpen(false)}
           >
-            Close ✕
+            Close
           </button>
         </div>
 
         {authenticated && (
           <div className="mobile-drawer-session-card">
             <div className="ticket-label">
-              ACTIVE SESSION ·{" "}
-              {sessionMeta?.rememberMe ? "30D WORKSTATION" : "8H SHIFT"}
+              Active session ({sessionMeta?.rememberMe ? "30d workstation" : "8h shift"})
             </div>
             <div style={{ fontWeight: 700, fontSize: 14, marginTop: 4 }}>
               {user.name}
@@ -364,7 +353,7 @@ export default function SiteHeader() {
             <div
               style={{ fontSize: 11, color: "var(--muted)", marginBottom: 10 }}
             >
-              {ARTISAN_ROLE_LABELS[user.role]} · {user.branchName}
+              {ARTISAN_ROLE_LABELS[user.role]}, {user.branchName}
             </div>
 
             <div style={{ display: "flex", gap: 8 }}>
@@ -408,7 +397,6 @@ export default function SiteHeader() {
                 onClick={() => setDrawerOpen(false)}
               >
                 <span>{link.label}</span>
-                <span>→</span>
               </Link>
             );
           })}
@@ -424,7 +412,7 @@ export default function SiteHeader() {
                   style={{ width: "100%" }}
                   onClick={() => setDrawerOpen(false)}
                 >
-                  Open Plant Console <span>→</span>
+                  Plant Console
                 </Link>
                 <Link
                   href="/"
@@ -432,7 +420,7 @@ export default function SiteHeader() {
                   style={{ width: "100%", border: "1px solid var(--line)" }}
                   onClick={() => setDrawerOpen(false)}
                 >
-                  Public Website <span>↗</span>
+                  Public Website
                 </Link>
               </>
             ) : (
@@ -443,7 +431,7 @@ export default function SiteHeader() {
                   style={{ width: "100%" }}
                   onClick={() => setDrawerOpen(false)}
                 >
-                  Sign In to Operations <span>→</span>
+                  Sign In
                 </Link>
                 <Link
                   href="/reset-password"
@@ -451,7 +439,7 @@ export default function SiteHeader() {
                   style={{ width: "100%", border: "1px solid var(--line)" }}
                   onClick={() => setDrawerOpen(false)}
                 >
-                  Reset Password <span>↺</span>
+                  Reset Password
                 </Link>
               </>
             )
@@ -463,7 +451,7 @@ export default function SiteHeader() {
                 style={{ width: "100%" }}
                 onClick={() => setDrawerOpen(false)}
               >
-                Request Production Quote <span>↗</span>
+                Request Quote
               </Link>
               <Link
                 href="/size-charts"
@@ -471,14 +459,13 @@ export default function SiteHeader() {
                 style={{ width: "100%", border: "1px solid var(--line)" }}
                 onClick={() => setDrawerOpen(false)}
               >
-                Size &amp; Ratio Calculator <span>⊞</span>
+                Size &amp; Grading
               </Link>
             </>
           )}
         </div>
       </dialog>
 
-      {/* Mobile Bottom Thumb-Zone Navigation Dock */}
       <nav
         className="mobile-bottom-dock no-print"
         aria-label="Quick Mobile Actions"
@@ -492,7 +479,6 @@ export default function SiteHeader() {
                   pathname.startsWith("/dashboard") ? "active" : ""
                 }`}
               >
-                <span aria-hidden="true">⊞</span>
                 <span>Console</span>
               </Link>
               <Link
@@ -501,7 +487,7 @@ export default function SiteHeader() {
                   pathname.startsWith("/workspace") ? "active" : ""
                 }`}
               >
-                <span aria-hidden="true">⚙</span>
+                <UiIcon name="settings" size={14} />
                 <span>Workspace</span>
               </Link>
               {isSuper && (
@@ -511,7 +497,7 @@ export default function SiteHeader() {
                     pathname.startsWith("/superadmin") ? "active" : ""
                   }`}
                 >
-                  <span aria-hidden="true">★</span>
+                  <UiIcon name="star" size={14} />
                   <span>HQ</span>
                 </Link>
               )}
@@ -521,7 +507,6 @@ export default function SiteHeader() {
                   pathname.startsWith("/tracker") ? "active" : ""
                 }`}
               >
-                <span aria-hidden="true">⌖</span>
                 <span>Tracker</span>
               </Link>
               <button
@@ -530,7 +515,6 @@ export default function SiteHeader() {
                 onClick={handleSignOut}
                 disabled={signingOut}
               >
-                <span aria-hidden="true">⇥</span>
                 <span>Sign Out</span>
               </button>
             </>
@@ -542,7 +526,7 @@ export default function SiteHeader() {
                   pathname.startsWith("/login") ? "active" : ""
                 }`}
               >
-                <span aria-hidden="true">🔐</span>
+                <UiIcon name="lock" size={14} />
                 <span>Sign In</span>
               </Link>
               <Link
@@ -551,11 +535,9 @@ export default function SiteHeader() {
                   pathname.startsWith("/reset-password") ? "active" : ""
                 }`}
               >
-                <span aria-hidden="true">↺</span>
                 <span>Reset</span>
               </Link>
               <Link href="/" className="mobile-dock-item">
-                <span aria-hidden="true">⌂</span>
                 <span>Public Site</span>
               </Link>
             </>
@@ -566,7 +548,6 @@ export default function SiteHeader() {
               href="/"
               className={`mobile-dock-item ${pathname === "/" ? "active" : ""}`}
             >
-              <span aria-hidden="true">⌂</span>
               <span>Home</span>
             </Link>
             <Link
@@ -575,7 +556,6 @@ export default function SiteHeader() {
                 pathname.startsWith("/services") ? "active" : ""
               }`}
             >
-              <span aria-hidden="true">✦</span>
               <span>Services</span>
             </Link>
             <Link
@@ -584,7 +564,6 @@ export default function SiteHeader() {
                 pathname.startsWith("/process") ? "active" : ""
               }`}
             >
-              <span aria-hidden="true">◈</span>
               <span>Process</span>
             </Link>
             <Link
@@ -593,7 +572,6 @@ export default function SiteHeader() {
                 pathname.startsWith("/size-charts") ? "active" : ""
               }`}
             >
-              <span aria-hidden="true">⊞</span>
               <span>Grading</span>
             </Link>
             <Link
@@ -602,7 +580,6 @@ export default function SiteHeader() {
                 pathname.startsWith("/quote") ? "active" : ""
               }`}
             >
-              <span aria-hidden="true">↗</span>
               <span>Quote</span>
             </Link>
           </>

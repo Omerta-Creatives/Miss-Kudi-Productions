@@ -45,6 +45,7 @@ Thumbs.db
 .vercel
 .turbo
 .eslintcache
+.hallmark/
 
 # Editor, scratch & agent directories
 .idea/

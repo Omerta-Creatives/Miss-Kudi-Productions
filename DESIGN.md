@@ -1,25 +1,23 @@
 ---
-name: "Miss Kudi Productions — Lagos Atelier & Operations OS"
-version: "1.0.0"
-designRead: "Lagos Garment Atelier Identity & Floor Security Ledger — high-contrast editorial serif paired with architectural hairline grids, tactile botanical olive ink, and interactive textile CAD telemetry."
-dials:
-  designVariance: 8
-  motionIntensity: 6
-  visualDensity: 5
+name: "Miss Kudi Productions — Lagos Garment Manufacturing Atelier"
+version: "2.0.0"
+genre: "editorial"
+posture: "restrained"
 colors:
   primary: "#3d4f22"
   primaryHover: "#2c3a18"
   secondary: "#556b2f"
   tertiary: "#b6a18a"
   surface: "#f8f5f0"
-  surfaceStone: "#f2ede4"
-  surfaceElevated: "#ffffff"
+  surfaceWarm: "#f4efe7"
+  surfaceStone: "#ede6da"
+  surfaceElevated: "#fdfcf9"
   surfaceConsole: "#141a0e"
   "on-surface": "#232b18"
-  "on-surface-muted": "#5c5851"
-  "on-primary": "#ffffff"
-  hairline: "#dcd6cc"
-  hairlineStrong: "#cfc8bc"
+  "on-surface-muted": "#5a564f"
+  "on-primary": "#fdfcf9"
+  hairline: "#dbd5ca"
+  hairlineStrong: "#cbc3b6"
   statusSuccessSurface: "#e9efe1"
   statusSuccessInk: "#166534"
   statusWarningSurface: "#fef3c7"
@@ -28,140 +26,93 @@ colors:
   statusErrorInk: "#991b1b"
 typography:
   headline:
-    fontFamily: "'Playfair Display', Georgia, serif"
-    fontSize: "clamp(1.95rem, 3.6vw, 2.85rem)"
+    fontFamily: "'Cormorant Garamond', Georgia, serif"
+    fontSize: "clamp(1.875rem, 2.4vw + 1rem, 3.125rem)"
     fontWeight: 600
-    letterSpacing: "-0.03em"
+    fontStyle: "normal"
+    letterSpacing: "-0.025em"
     lineHeight: 1.12
   subheadline:
-    fontFamily: "'Playfair Display', Georgia, serif"
-    fontSize: "1.35rem"
+    fontFamily: "'Cormorant Garamond', Georgia, serif"
+    fontSize: "clamp(1.2rem, 0.7vw + 0.9rem, 1.55rem)"
     fontWeight: 600
-    letterSpacing: "-0.02em"
-    lineHeight: 1.25
+    fontStyle: "normal"
+    letterSpacing: "-0.015em"
+    lineHeight: 1.24
   body:
-    fontFamily: "'DM Sans', Arial, sans-serif"
+    fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif"
     fontSize: "1rem"
     fontWeight: 400
     lineHeight: 1.65
   label:
-    fontFamily: "'DM Sans', Arial, sans-serif"
+    fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif"
     fontSize: "0.875rem"
     fontWeight: 600
     lineHeight: 1.4
-  telemetry:
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-    fontSize: "0.75rem"
-    fontWeight: 600
+  mono:
+    fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace"
+    fontSize: "0.8125rem"
+    fontWeight: 500
     fontVariantNumeric: "tabular-nums"
 rounded:
   none: "0px"
-  xs: "2px"
-  sm: "4px"
-  md: "6px"
+  control: "4px"
+  card: "6px"
+  pill: "999px"
 spacing:
-  xs: "6px"
+  2xs: "4px"
+  xs: "8px"
   sm: "12px"
-  md: "20px"
-  lg: "32px"
-  xl: "56px"
+  md: "16px"
+  lg: "24px"
+  xl: "40px"
+  2xl: "64px"
 elevation:
   flat: "none"
-  subtle: "0 8px 28px rgba(35, 43, 24, 0.045)"
+  subtle: "0 8px 24px rgba(35, 43, 24, 0.045)"
   modal: "0 20px 48px rgba(20, 26, 14, 0.16)"
 motion:
-  easingArchitectural: "cubic-bezier(0.22, 1, 0.36, 1)"
-  durationFast: "180ms"
-  durationBase: "320ms"
-  durationScene: "560ms"
-components:
-  button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
-    rounded: "{rounded.xs}"
-    minHeight: "48px"
-    paddingInline: "{spacing.md}"
-  button-secondary:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface}"
-    borderColor: "{colors.hairline}"
-    rounded: "{rounded.xs}"
-    minHeight: "48px"
-    paddingInline: "{spacing.md}"
-  input-field:
-    backgroundColor: "{colors.surfaceElevated}"
-    textColor: "{colors.on-surface}"
-    borderColor: "{colors.hairlineStrong}"
-    fontSize: "{typography.body.fontSize}"
-    rounded: "{rounded.xs}"
-    minHeight: "48px"
-  ledger-panel:
-    backgroundColor: "{colors.surfaceElevated}"
-    borderColor: "{colors.hairline}"
-    rounded: "{rounded.sm}"
-    shadow: "{elevation.subtle}"
+  easeOut: "cubic-bezier(0.22, 1, 0.36, 1)"
+  durationShort: "160ms"
+  durationMed: "280ms"
+  durationLong: "480ms"
 ---
 
 # Miss Kudi Productions — Design System (`DESIGN.md`)
 
-Specification structured according to [`google-labs-code/design.md`](https://github.com/google-labs-code/design.md), governed by [`nutlope/hallmark`](https://github.com/nutlope/hallmark) anti-slop quality gates, interactive WebGL/2D Canvas telemetry inspired by [`DavidHDev/canvas-ui`](https://github.com/DavidHDev/canvas-ui), and choreographed motion from [`C-Jeril/framer-motion-skills`](https://github.com/C-Jeril/framer-motion-skills), [`greensock/gsap-skills`](https://github.com/greensock/gsap-skills), and [`oso95/scroll-world`](https://github.com/oso95/scroll-world).
+Governed by [Hallmark v2.0](https://github.com/nutlope/hallmark) (`editorial` genre, `restrained` posture) and tokenized across `src/app/tokens.css`, `src/app/base.css`, and `src/app/globals.css`.
 
 ## Overview
 
-Miss Kudi Productions is a Lagos-headquartered B2B garment manufacturing partner operating three specialized plants across Yaba, Victoria Island, and Ikeja. Every interface balances **editorial fashion atelier craft** with **industrial AQL 2.5 floor precision**. Instead of generic SaaS card grids or neon dark-mode gradients, surfaces evoke unbleached pattern paper, woven damask labels, brass pattern weights, and structured production tickets.
+Miss Kudi Productions is a B2B garment manufacturing atelier at **1 Alawode Street, Surulere, Lagos**, operating three specialized divisions across Surulere, Victoria Island, and Ikeja. Surfaces draw from unbleached pattern paper, warm ivory spec sheets, botanical olive ink, brass pattern weights, and structured factory job tickets.
 
 ## Colors
 
-- **Atelier Paper (`{colors.surface}` · `#f8f5f0`) & Warm Stone (`{colors.surfaceStone}` · `#f2ede4`):** Primary page canvas and secondary grouping wells. Never substitute sterile `#f9fafb` cool gray.
-- **Crisp Ledger Surface (`{colors.surfaceElevated}` · `#ffffff`):** Reserved for interactive form desks, job tickets, and specification ledgers framed by `1px solid` `{colors.hairline}` (`#dcd6cc`).
-- **Botanical Olive Ink (`{colors.primary}` · `#3d4f22`):** Primary brand action color, active navigation pill fill, focus rings, and native control `accent-color`. Hover deepens to `{colors.primaryHover}` (`#2c3a18`).
-- **Warm Charcoal Copy (`{colors.on-surface}` · `#232b18`):** All primary prose and headings; pure `#000000` is banned.
-- **Taupe Brass (`{colors.tertiary}` · `#b6a18a`):** Used in CAD weave canvases, ruler ticks, and understated structural dividers.
-- **Console Header (`{colors.surfaceConsole}` · `#141a0e`):** Strictly scoped to the internal RBAC session strip on in-house operations routes (`/superadmin`, `/dashboard`, `/workspace`, `/tracker`, `/login`, `/reset-password`).
+- **Atelier Paper (`--color-paper` · `#f8f5f0`) & Warm Stone (`--color-paper-3` · `#ede6da`):** Primary page canvas and secondary grouping wells. Cool `#f9fafb` grays and pure `#ffffff` page backgrounds are prohibited.
+- **Warm Ivory Ledger (`--color-elevated` · `#fdfcf9`):** Used for form desks, production job tickets, and specification tables framed by `1px solid var(--color-rule)` (`#dbd5ca`).
+- **Botanical Olive Ink (`--color-accent` · `#3d4f22`):** Primary action fill, active navigation state, focus rings, and form `accent-color`. Hover deepens to `--color-accent-hover` (`#2c3a18`).
+- **Warm Charcoal Copy (`--color-ink` · `#232b18`):** Primary headings and body prose; pure `#000000` is prohibited.
+- **Taupe Brass (`--color-gold` · `#b6a18a`):** Used in pattern weave canvases, ruler ticks, and understated rules.
+- **Console Header (`--color-console` · `#141a0e`):** Scoped to the dark hero stage and the internal session bar on studio routes (`/superadmin`, `/dashboard`, `/workspace`, `/tracker`, `/login`, `/reset-password`).
 
 ## Typography
 
-- **Editorial Headlines (`{typography.headline.fontFamily}`):** Set in `Playfair Display` with tight `-0.03em` tracking, `text-wrap: balance`, and selective italic emphasis for craft contrast.
-- **Interface & Form Labels (`{typography.label.fontFamily}`):** Set in `DM Sans` (`0.875rem`, weight `600`, natural sentence case). Per Hallmark `sloplint`, regular `<label>` elements must use readable sentence case rather than tracked-out tiny all-caps.
-- **Form Inputs (`{typography.body.fontSize}`):** Always `1rem` (`16px`) minimum on `<input>`, `<select>`, and `<textarea>` to prevent mobile iOS viewport auto-zoom while typing.
-- **Technical Telemetry (`{typography.telemetry.fontFamily}`):** Monospace with `font-variant-numeric: tabular-nums` for Job Codes (`MKP-YYYYMMDD-NNN`), 6-digit OTP verification codes, session countdowns, GSM weights, and NGN (`₦`) accounting ledgers.
+- **Roman Editorial Headlines (`Cormorant Garamond`):** Set in roman upright weight (`600`) with `-0.025em` tracking and `text-wrap: balance`. Italic emphasis inside display headings and tracked-out eyebrow kickers above headings are avoided per Hallmark editorial gates.
+- **Interface & Form Copy (`Plus Jakarta Sans`):** Readable sentence-case labels (`0.875rem`, weight `600`) and `1rem` (`16px`) minimum form control text so mobile browsers never auto-zoom on focus.
+- **Tabular Figures (`JetBrains Mono`):** Used with `font-variant-numeric: tabular-nums` for Job Codes (`MKP-YYYYMMDD-NNN`), measurement matrices, fabric yardage, and NGN (`₦`) ledgers.
 
-## Layout
+## Layout & Rhythm
 
-- **Asymmetrical Split & Numbered Ledgers:** Avoid repeating uniform 3-card or 4-card equal grids. Pair a focused primary workspace (`0.92fr`) with an editorial telemetry & directory ledger (`1.08fr`) on desktop, collapsing cleanly to a single-column scan path below `960px`.
-- **Keyboard-Safe Form Placement:** On `/login` and `/reset-password`, keep primary email, password/OTP inputs, Remember Me control, and submit CTA near the top of the viewport so mobile virtual keyboards never obscure the action button.
-- **Coarse Pointer Ergonomics:** Every interactive button, checkbox row, and input maintains at least `48px` block height (`52px` under `@media (pointer: coarse)`), with Gestalt proximity keeping label-to-input spacing (`6px`) tighter than group-to-group spacing (`18px`).
+- **4px Spatial Rhythm:** All spacing tokens step on a 4px grid (`4px`, `8px`, `12px`, `16px`, `24px`, `32px`, `40px`, `48px`, `64px`, `96px`).
+- **Editorial Ledger Splits:** Pair asymmetric lead columns with specification tables and numbered production milestones rather than uniform SaaS card walls, collapsing cleanly to single-column mobile stacks below `960px`.
+- **Touch & Keyboard Ergonomics:** Interactive buttons and form fields maintain a `44px–48px` minimum hit target (`52px` on coarse pointers), with field hints placed above inputs so autofill popovers and mobile keyboards never obscure instructions.
 
-## Elevation & Depth
+## Components & Iconography
 
-- Depth comes from `1px solid` `{colors.hairline}` borders, paper-to-white tonal contrast, and ultra-diffuse `{elevation.subtle}` (`< 0.05` alpha).
-- Heavy drop shadows, blurred neon glows, and glassmorphic rainbow backdrops are strictly prohibited.
+- **Action Hierarchy:** One filled primary action (`button-dark` or `hero-fs-btn-gold`) paired with an outline or quiet secondary action (`button-light`). Labels stay concise (four words or fewer) without trailing Unicode arrow dingbats.
+- **Accessible Vector Icons (`UiIcon`):** All interface icons render crisp `1.5px` stroke SVGs with explicit `aria-hidden="true"` rather than emoji glyphs.
+- **Modal Elevation:** Dialogs (`.mkp-dialog`) rely on modal elevation (`--shadow-modal`) without redundant outer hairline borders.
 
-## Shapes
+## Motion
 
-- Architectural corners use `{rounded.xs}` (`2px`) on buttons and inputs and `{rounded.sm}` (`4px`) on ledger panels and modal dialogs, mirroring cut pattern card stock and woven garment labels.
-
-## Components
-
-- **Primary & Secondary Actions (`button-primary`, `button-secondary`):** Never place two filled primary buttons side-by-side (Hallmark `sloplint` rule); pair one filled `{colors.primary}` CTA with a hairline `{colors.surface}` secondary action or inline text link.
-- **Authentication & Recovery Controls (`input-field`):**
-  - Email fields use `type="email"`, `autocomplete="username"`, `spellcheck="false"`, `autocapitalize="none"`, `autocorrect="off"`, and `enterkeyhint="next"`.
-  - Sign-in passwords use `autocomplete="current-password"`; password resets and provisioning use `autocomplete="new-password"` with complexity rules placed **above** the input via `aria-describedby`.
-  - Validation feedback defers until interaction using `:user-invalid` / `:user-valid` synchronized with `aria-invalid` on `blur` and `input`.
-  - 6-digit OTP verification uses a **single** `<input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\d{6}">` styled with monospace letter-spacing and progressive WebOTP (`OTPCredential` + `AbortController` + `form.requestSubmit()`).
-- **Atelier Weave Canvas (`AtelierWeaveCanvas`):** GPU-friendly `<canvas>` warp-and-weft CAD pattern visualizer blending live DOM telemetry badges over responsive thread harmonics (`DavidHDev/canvas-ui` pattern), reacting to pointer coordinates, scroll depth, and authentication state changes.
-
-## Motion & Micro-interactions
-
-- **Choreography (`framer-motion` / GSAP / Scroll-World principles):**
-  - Animate exclusively compositor-safe `transform` (`translate3d`, `scale`) and `opacity` using `{motion.easingArchitectural}` (`cubic-bezier(0.22, 1, 0.36, 1)`).
-  - Step transitions inside `/login` and `/reset-password` use `AnimatePresence mode="wait"` with subtle `10px` vertical travel and `220ms` duration so state changes feel crisp and mechanical, never sluggish.
-  - Scroll-linked parallax plates scrub smoothly via `useScroll` and `useTransform` without layout thrashing.
-- **Reduced Motion Guardrail:** Always check `useReducedMotion()` and `@media (prefers-reduced-motion: reduce)` to freeze canvas wave oscillation and instant-swap transitions when requested by the operating system.
-
-## Do's and Don'ts
-
-- **Do** enforce real server-verified `HttpOnly; SameSite=Lax` signed session cookies (`__Host-mkp_session` over HTTPS, `mkp_session` on `localhost`) with explicit 30-day **Remember Me** vs. 8-hour **Floor Shift** lifetimes.
-- **Do** place field hints and password requirements **above** `<input>` elements so browser autofill popovers and mobile keyboards never cover instructions.
-- **Don't** split 6-digit OTP codes into six separate `<input maxlength="1">` boxes, block password pasting, or ask users to type new passwords twice.
-- **Don't** use AI cliché tropes: no purple/indigo gradients, no generic placeholder avatars, no tracked-out 9px uppercase form `<label>` text, and no unauthenticated privilege escalation in client headers.
+- **Compositor-Safe Transitions:** Transitions animate `transform` and `opacity` using `--ease-out` (`cubic-bezier(0.22, 1, 0.36, 1)`), with full `@media (prefers-reduced-motion: reduce)` support across `base.css` and `globals.css`.

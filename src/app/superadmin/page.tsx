@@ -26,6 +26,7 @@ import {
   UserAccessTier,
 } from "../lib/production-os";
 import { ModalDialog } from "../components/ProductionJobTicketModal";
+import { UiIcon } from "../components/UiIcon";
 
 type SuperadminSection = "overview" | "accounts" | "facilities" | "audit";
 
@@ -350,13 +351,13 @@ export default function SuperadminHqPage() {
       }).catch(() => {});
 
       const logs = appendAuditLog({
-        action: "rbac.role_updated",
+        action: "team.role_updated",
         actor: currentUser.name,
         role: "Superadmin HQ",
         targetRef: target.email,
-        summary: `Updated ${target.name} → Tier: ${target.accessTier.toUpperCase()} · Role: ${
+        summary: `Updated ${target.name} to Tier: ${target.accessTier.toUpperCase()}, Role: ${
           ARTISAN_ROLE_LABELS[target.role]
-        } · Branch: ${target.branchName}.`,
+        }, Branch: ${target.branchName}.`,
       });
       setAuditLogs(logs);
       showNotice(
@@ -421,7 +422,7 @@ export default function SuperadminHqPage() {
         .catch(() => {});
 
       const logs = appendAuditLog({
-        action: "rbac.user_created",
+        action: "team.user_created",
         actor: currentUser.name,
         role: "Superadmin HQ",
         targetRef: created.email,
@@ -497,7 +498,7 @@ export default function SuperadminHqPage() {
         .catch(() => {});
 
       const logs = appendAuditLog({
-        action: "rbac.user_updated",
+        action: "team.user_updated",
         actor: currentUser.name,
         role: "Superadmin HQ",
         targetRef: updatedRecord.email,
@@ -552,7 +553,7 @@ export default function SuperadminHqPage() {
     ).catch(() => {});
 
     const logs = appendAuditLog({
-      action: "rbac.user_deleted",
+      action: "team.user_deleted",
       actor: currentUser.name,
       role: "Superadmin HQ",
       targetRef: deletingStaff.email,
@@ -571,15 +572,15 @@ export default function SuperadminHqPage() {
           className="workspace-panel"
           style={{ maxWidth: 580, marginInline: "auto" }}
         >
-          <span className="mkp-badge mkp-badge-critical">
-            SUPERADMIN CLEARANCE REQUIRED
-          </span>
-          <h2 style={{ marginTop: 12, fontSize: 26 }}>
+          <h2 style={{ marginTop: 0, fontSize: 26 }}>
             Restricted Executive HQ Console
           </h2>
-          <p style={{ fontSize: 13.5, color: "var(--muted)", lineHeight: 1.7 }}>
+          <span className="mkp-badge mkp-badge-critical" style={{ marginTop: 6 }}>
+            Superadmin clearance required
+          </span>
+          <p style={{ fontSize: 13.5, color: "var(--muted)", lineHeight: 1.7, marginTop: 12 }}>
             You are signed in as <strong>{currentUser.name}</strong> (
-            <code>{currentUser.accessTier.toUpperCase()}</code> ·{" "}
+            <span className="mono">{currentUser.accessTier}</span>,{" "}
             {ARTISAN_ROLE_LABELS[currentUser.role]}). Only{" "}
             <strong>Superadmin</strong> accounts can manage facilities or global
             access permissions.
@@ -588,7 +589,7 @@ export default function SuperadminHqPage() {
             style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 20 }}
           >
             <Link className="button button-dark" href="/dashboard">
-              Return to Plant Console <span>→</span>
+              Plant Console
             </Link>
             <button
               type="button"
@@ -668,7 +669,7 @@ export default function SuperadminHqPage() {
     },
     audit: {
       title: "Security & Audit Log",
-      subtitle: `Immutable record of role updates, facility changes, and floor quality sign-offs`,
+      subtitle: `Verified log of role updates, facility changes, and floor quality sign-offs`,
     },
   };
 
@@ -787,18 +788,17 @@ export default function SuperadminHqPage() {
           {/* Clean Session & Account Footer */}
           <div className="sidebar-footer-card">
             <div className="sidebar-section-label" style={{ marginTop: 0 }}>
-              SESSION
+              Session
             </div>
             <Link className="sidebar-quick-btn" href="/dashboard">
               <span>Plant Console</span>
-              <span aria-hidden="true">→</span>
             </Link>
             <Link
               className="sidebar-quick-btn"
               href="/login?mode=change-password"
             >
               <span>Change Password</span>
-              <span aria-hidden="true">⚙</span>
+              <UiIcon name="settings" size={14} />
             </Link>
             <button
               type="button"
@@ -807,7 +807,6 @@ export default function SuperadminHqPage() {
               disabled={signingOut}
             >
               <span>{signingOut ? "Signing out..." : "Sign Out"}</span>
-              <span aria-hidden="true">⇥</span>
             </button>
           </div>
         </aside>
@@ -875,7 +874,7 @@ export default function SuperadminHqPage() {
             <>
               <div className="kpi-grid-4">
                 <div className="kpi-card">
-                  <span className="ticket-label">GLOBAL PIPELINE GMV</span>
+                  <span className="ticket-label">Global pipeline GMV</span>
                   <div className="kpi-value mono">
                     ₦{globalGmv.toLocaleString()}
                   </div>
@@ -885,7 +884,7 @@ export default function SuperadminHqPage() {
                 </div>
 
                 <div className="kpi-card">
-                  <span className="ticket-label">OPERATING NET PROFIT</span>
+                  <span className="ticket-label">Operating net profit</span>
                   <div
                     className="kpi-value mono"
                     style={{ color: "var(--ink)" }}
@@ -893,13 +892,13 @@ export default function SuperadminHqPage() {
                     ₦{globalTrueNetProfit.toLocaleString()}
                   </div>
                   <div className="kpi-sub">
-                    COGS ₦{estimatedCogs.toLocaleString()} · OpEx ₦
+                    COGS ₦{estimatedCogs.toLocaleString()}, OpEx ₦
                     {globalOpEx.toLocaleString()}
                   </div>
                 </div>
 
                 <div className="kpi-card">
-                  <span className="ticket-label">ACTIVE FACILITIES</span>
+                  <span className="ticket-label">Active facilities</span>
                   <div className="kpi-value mono">
                     {branches.length} Plants
                   </div>
@@ -909,11 +908,10 @@ export default function SuperadminHqPage() {
                 </div>
 
                 <div className="kpi-card">
-                  <span className="ticket-label">AUTHORIZED TEAM</span>
+                  <span className="ticket-label">Authorized team</span>
                   <div className="kpi-value mono">{artisans.length} Users</div>
                   <div className="kpi-sub">
-                    {superadminCount} HQ · {adminCount} Admin · {staffCount}{" "}
-                    Staff
+                    {superadminCount} HQ, {adminCount} Admin, {staffCount} Staff
                   </div>
                 </div>
               </div>
@@ -933,7 +931,7 @@ export default function SuperadminHqPage() {
                     className="mkp-inline-btn"
                     onClick={() => setActiveSection("facilities")}
                   >
-                    Manage facilities ({branches.length}) →
+                    Facilities ({branches.length})
                   </button>
                 </div>
 
@@ -969,7 +967,7 @@ export default function SuperadminHqPage() {
                             className="mkp-inline-btn"
                             onClick={() => handleInspectBranch(br.id)}
                           >
-                            Open Plant Console →
+                            Plant Console
                           </button>
                           <button
                             type="button"
@@ -1004,7 +1002,7 @@ export default function SuperadminHqPage() {
                         setActiveSection("accounts");
                       }}
                     >
-                      View all ({artisans.length}) →
+                      View all ({artisans.length})
                     </button>
                   </div>
 
@@ -1031,7 +1029,7 @@ export default function SuperadminHqPage() {
                             setActiveSection("accounts");
                           }}
                         >
-                          Filter →
+                          Filter
                         </button>
                       </div>
                     </div>
@@ -1055,7 +1053,7 @@ export default function SuperadminHqPage() {
                             setActiveSection("accounts");
                           }}
                         >
-                          Filter →
+                          Filter
                         </button>
                       </div>
                     </div>
@@ -1079,7 +1077,7 @@ export default function SuperadminHqPage() {
                             setActiveSection("accounts");
                           }}
                         >
-                          Filter →
+                          Filter
                         </button>
                       </div>
                     </div>
@@ -1097,7 +1095,7 @@ export default function SuperadminHqPage() {
                       className="mkp-inline-btn"
                       onClick={() => setActiveSection("audit")}
                     >
-                      Full log ({auditLogs.length}) →
+                      Full log ({auditLogs.length})
                     </button>
                   </div>
 
@@ -1141,48 +1139,36 @@ export default function SuperadminHqPage() {
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   <button
                     type="button"
-                    className="mkp-inline-btn"
-                    style={
-                      tierFilter === "all"
-                        ? { background: "var(--ink)", color: "#fff" }
-                        : undefined
-                    }
+                    className={`mkp-inline-btn ${
+                      tierFilter === "all" ? "mkp-inline-btn-active" : ""
+                    }`}
                     onClick={() => setTierFilter("all")}
                   >
                     All ({artisans.length})
                   </button>
                   <button
                     type="button"
-                    className="mkp-inline-btn"
-                    style={
-                      tierFilter === "superadmin"
-                        ? { background: "var(--ink)", color: "#fff" }
-                        : undefined
-                    }
+                    className={`mkp-inline-btn ${
+                      tierFilter === "superadmin" ? "mkp-inline-btn-active" : ""
+                    }`}
                     onClick={() => setTierFilter("superadmin")}
                   >
                     Superadmins ({superadminCount})
                   </button>
                   <button
                     type="button"
-                    className="mkp-inline-btn"
-                    style={
-                      tierFilter === "admin"
-                        ? { background: "var(--ink)", color: "#fff" }
-                        : undefined
-                    }
+                    className={`mkp-inline-btn ${
+                      tierFilter === "admin" ? "mkp-inline-btn-active" : ""
+                    }`}
                     onClick={() => setTierFilter("admin")}
                   >
                     Plant Admins ({adminCount})
                   </button>
                   <button
                     type="button"
-                    className="mkp-inline-btn"
-                    style={
-                      tierFilter === "staff"
-                        ? { background: "var(--ink)", color: "#fff" }
-                        : undefined
-                    }
+                    className={`mkp-inline-btn ${
+                      tierFilter === "staff" ? "mkp-inline-btn-active" : ""
+                    }`}
                     onClick={() => setTierFilter("staff")}
                   >
                     Floor Specialists ({staffCount})
@@ -1223,7 +1209,7 @@ export default function SuperadminHqPage() {
               <div
                 tabIndex={0}
                 role="region"
-                aria-labelledby="superadmin-rbac-caption"
+                aria-labelledby="superadmin-team-caption"
                 className="table-wrapper"
               >
                 <table
@@ -1239,7 +1225,7 @@ export default function SuperadminHqPage() {
                     } as React.CSSProperties
                   }
                 >
-                  <caption id="superadmin-rbac-caption" className="sr-only">
+                  <caption id="superadmin-team-caption" className="sr-only">
                     Authorized Superadmin, Plant Admin, and Staff accounts
                   </caption>
                   <thead>
@@ -1280,7 +1266,7 @@ export default function SuperadminHqPage() {
                               <span>{u.name}</span>
                               {u.accessTier === "superadmin" && (
                                 <span className="mkp-badge mkp-badge-olive">
-                                  HQ ★
+                                  HQ
                                 </span>
                               )}
                             </div>
@@ -1393,8 +1379,7 @@ export default function SuperadminHqPage() {
                               {u.id !== currentUser.id && (
                                 <button
                                   type="button"
-                                  className="mkp-inline-btn"
-                                  style={{ color: "#9e2a2b" }}
+                                  className="mkp-inline-btn mkp-inline-btn-danger"
                                   onClick={() => setDeletingStaff(u)}
                                 >
                                   Delete
@@ -1503,7 +1488,7 @@ export default function SuperadminHqPage() {
                                 className="mkp-inline-btn"
                                 onClick={() => handleInspectBranch(br.id)}
                               >
-                                Inspect →
+                                Inspect
                               </button>
                               <button
                                 type="button"
@@ -1515,8 +1500,7 @@ export default function SuperadminHqPage() {
                               {branches.length > 1 && (
                                 <button
                                   type="button"
-                                  className="mkp-inline-btn"
-                                  style={{ color: "#9e2a2b" }}
+                                  className="mkp-inline-btn mkp-inline-btn-danger"
                                   onClick={() => setDeletingBranch(br)}
                                 >
                                   Delete
@@ -1996,7 +1980,7 @@ export default function SuperadminHqPage() {
                   marginBottom: 4,
                 }}
               >
-                8+ characters — clears any failed-login lockout
+                8+ characters (clears any failed-login lockout)
               </span>
               <input
                 name="password"

@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
            VALUES ($1,$2,$3,$4,$5,$6)`,
           [
             `aud-${Date.now()}`,
-            isSelf ? "auth.password_changed" : "rbac.password_reset_by_admin",
+            isSelf ? "auth.password_changed" : "team.password_reset_by_admin",
             actorSession.name,
             actorSession.accessTier.toUpperCase(),
             targetEmail,

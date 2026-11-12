@@ -15,10 +15,10 @@ export const services: ServiceItem[] = [
   {
     number: "01",
     title: "Bulk garment production",
-    subtitle: "Industrial Cut-and-Sew Lines · 50 to 5,000+ Units",
+    subtitle: "Industrial Cut-and-Sew Lines, 50 to 5,000+ Units",
     copy: "Full-run manufacturing engineered around your approved tech packs, graded patterns, size ratios and delivery calendar across our 92+ industrial Juki & Brother sewing stations.",
-    moqLabel: "MOQ: 50 – 5,000+ pcs",
-    leadTimeLabel: "3 – 6 Weeks Turnaround",
+    moqLabel: "MOQ: 50 to 5,000+ pcs",
+    leadTimeLabel: "3 to 6 Weeks Turnaround",
     artisanRole: "Master Tailor Lead & Line Supervisors",
     deliverables: [
       "Balanced sewing line allocation by garment operation",
@@ -34,7 +34,7 @@ export const services: ServiceItem[] = [
     subtitle: "Retail-Ready Branding, Woven Labels & Trim Sourcing",
     copy: "Turnkey garments prepared for direct retail or e-commerce launches under your label. Every unit includes custom woven neck labels, care tags, branded hardware and polybag barcoding.",
     moqLabel: "MOQ: 100 pcs per style",
-    leadTimeLabel: "4 – 6 Weeks Turnaround",
+    leadTimeLabel: "4 to 6 Weeks Turnaround",
     artisanRole: "Trim Procurement & Finishing Specialists",
     deliverables: [
       "Custom woven damask neck labels, satin care labels & swing tags",
@@ -47,13 +47,13 @@ export const services: ServiceItem[] = [
   {
     number: "03",
     title: "Pattern-led development & grading",
-    subtitle: "CAD Pattern Drafting, Toiles & XS–XXL Size Grading",
+    subtitle: "CAD Pattern Drafting, Toiles & XS to XXL Size Grading",
     copy: "Precision pattern engineering in our Surulere CAD Pattern Studio. We translate sketches, physical reference garments or digital tech packs into production-ready graded blocks.",
     moqLabel: "1st Fit Sample + Graded Run",
-    leadTimeLabel: "7 – 14 Days Sample Lead",
+    leadTimeLabel: "7 to 14 Days Sample Lead",
     artisanRole: "Senior Pattern Designers & Cutting Masters",
     deliverables: [
-      "Digital CAD pattern drafting & XS–XXL nest grading",
+      "Digital CAD pattern drafting & XS to XXL nest grading",
       "Calico toile / first fit sample with revision round",
       "Zero-waste marker nesting for optimal fabric yield per meter",
     ],
@@ -69,7 +69,7 @@ export const services: ServiceItem[] = [
     leadTimeLabel: "48-Hour Final QC Sign-Off",
     artisanRole: "AQL 2.5 Quality Control Inspectors",
     deliverables: [
-      "Point-of-measure (POM) verification across XS–XXL size runs",
+      "Point-of-measure (POM) verification across XS to XXL size runs",
       "Seam tensile strength, colorfastness & needle-detection checks",
       "Printable AQL 2.5 QC Passport & export carton manifest",
     ],
@@ -93,27 +93,26 @@ export interface ProcessStageDetail {
 export const processStages: ProcessStageDetail[] = [
   {
     number: "01",
-    stageCode: "STAGE 01 · BRIEF & SPEC INTAKE",
+    stageCode: "Stage 01: Brief & spec intake",
     title: "Share your brief & size ratio",
     leadRole: "Production Manager & Merchandising Desk",
-    duration: "Day 1 – 2",
-    copy: "Submit your garment category, target volume, XS–XXL size breakdown and technical specifications via our live Quote Calculator. You receive an instant Job Code and pro-forma cost breakdown.",
+    duration: "Day 1 to 2",
+    copy: "Submit your garment category, target volume, XS to XXL size breakdown and technical specifications via our live Quote Calculator. You receive an instant Job Code and pro-forma cost breakdown.",
     checkpoints: [
       "Instant Job Code generation (e.g. MKP-20261025-841)",
       "Bill of Materials (BOM) & fabric consumption calculation",
       "Volume tier discount lock-in (up to 18% B2B efficiency)",
     ],
-    image:
-      "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1000&q=85",
-    alt: "Fashion designer reviewing garment tech packs and fabric swatches on studio desk",
+    image: "/images/hero-lagos-atelier.jpg",
+    alt: "Master tailors and pattern designers reviewing garment tech packs and fabric swatches on timber studio desk",
   },
   {
     number: "02",
-    stageCode: "STAGE 02 · PATTERN STUDIO & QUOTATION",
+    stageCode: "Stage 02: Pattern studio & quotation",
     title: "CAD pattern drafting & costing sign-off",
     leadRole: "Senior Pattern Designer (Surulere Pattern Studio)",
-    duration: "Day 3 – 7",
-    copy: "Our Pattern Designers draft or validate your master block, grade across XS–XXL sizes, and compute exact marker efficiency so you never overpay for fabric yardage.",
+    duration: "Day 3 to 7",
+    copy: "Our Pattern Designers draft or validate your master block, grade across XS to XXL sizes, and compute exact marker efficiency so you never overpay for fabric yardage.",
     checkpoints: [
       "Graded measurement spec sheet (inches & cm)",
       "Marker yield optimization (94%+ fabric utilization)",
@@ -124,7 +123,7 @@ export const processStages: ProcessStageDetail[] = [
   },
   {
     number: "03",
-    stageCode: "STAGE 03 · PRE-PRODUCTION SAMPLE & CUTTING",
+    stageCode: "Stage 03: Pre-production sample & cutting",
     title: "Pre-production approval & precision cutting",
     leadRole: "Cutting Master & Sample Room Lead",
     duration: "Week 2",
@@ -139,10 +138,10 @@ export const processStages: ProcessStageDetail[] = [
   },
   {
     number: "04",
-    stageCode: "STAGE 04 · SEWING LINES & AQL 2.5 QC",
+    stageCode: "Stage 04: Sewing lines & AQL 2.5 QC",
     title: "Bulk sewing & multi-point quality checks",
     leadRole: "Master Tailor Lead & QC Inspector",
-    duration: "Week 3 – 4",
+    duration: "Week 3 to 4",
     copy: "Garments flow through specialized industrial lockstitch, 5-thread overlock, coverstitch and buttonhole stations while AQL 2.5 QC Inspectors audit units at inline and end-of-line checkpoints.",
     checkpoints: [
       "Dedicated sewing line balanced to your garment type",
@@ -154,10 +153,10 @@ export const processStages: ProcessStageDetail[] = [
   },
   {
     number: "05",
-    stageCode: "STAGE 05 · FINISHING & GLOBAL DISPATCH",
+    stageCode: "Stage 05: Finishing & global dispatch",
     title: "Steam finishing, packing & dispatch",
     leadRole: "Finishing & Export Logistics Lead",
-    duration: "Week 4 – 5",
+    duration: "Week 4 to 5",
     copy: "Approved garments are thread-trimmed, vacuum-steam pressed, tagged with your brand's barcode labels, folded into export-grade cartons, and dispatched across Nigeria or internationally.",
     checkpoints: [
       "Industrial vacuum-table steam pressing & final spotting",
@@ -188,47 +187,43 @@ export interface GarmentCategoryCard {
 export const garmentCategories: GarmentCategoryCard[] = [
   {
     title: "Heavyweight Streetwear & Jersey",
-    tag: "HOODIES · TEES · SWEATSHIRTS",
-    gsmRange: "240 – 480 GSM Cotton Fleece & Combed Jersey",
+    tag: "Hoodies, tees, sweatshirts",
+    gsmRange: "240 to 480 GSM Cotton Fleece & Combed Jersey",
     moq: "50 pcs / style",
     description:
       "Drop-shoulder boxy tees, French terry hoodies, twin-needle coverstitch hems, puff/screen print and high-density embroidery.",
-    image:
-      "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=900&q=85",
-    alt: "Heavyweight cotton streetwear t-shirts and hoodies on studio rack",
+    image: "/images/sewing-production-line.jpg",
+    alt: "Heavyweight cotton streetwear t-shirts and hoodies on studio sewing floor",
   },
   {
     title: "Structured Woven Tailoring & Outerwear",
-    tag: "BLAZERS · TROUSERS · TRENCHES",
-    gsmRange: "220 – 380 GSM Gabardine, Linen & Wool Blends",
+    tag: "Blazers, trousers, trenches",
+    gsmRange: "220 to 380 GSM Gabardine, Linen & Wool Blends",
     moq: "50 pcs / style",
     description:
       "Half-canvas and fusible interlining blazers, pleated wide-leg trousers, welt pockets, horn buttons and full cupro/satin linings.",
-    image:
-      "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=900&q=85",
-    alt: "Tailored structured blazer and menswear suiting craftsmanship",
+    image: "/images/qc-finishing-bay.jpg",
+    alt: "Tailored structured blazer and menswear suiting craftsmanship in finishing bay",
   },
   {
     title: "Luxury Resortwear & Contemporary Womenswear",
-    tag: "DRESSES · CO-ORDS · SILK SETS",
-    gsmRange: "90 – 210 GSM Silk Crepe, Viscose, Adire & Linen",
+    tag: "Dresses, co-ords, silk sets",
+    gsmRange: "90 to 210 GSM Silk Crepe, Viscose, Adire & Linen",
     moq: "50 pcs / style",
     description:
       "French-seamed resort shirts, bias-cut midi dresses, concealed zip closures, baby-locked ruffles and hand-finished artisanal details.",
-    image:
-      "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=900&q=85",
-    alt: "Contemporary womenswear dresses and resortwear garments on rack",
+    image: "/images/lagos-atelier-lookbook.jpg",
+    alt: "Contemporary womenswear dresses and resortwear garments on brass atelier rack",
   },
   {
     title: "Corporate Uniforms, Workwear & Denim",
-    tag: "UNIFORMS · CARGO · HEAVY TWILL",
-    gsmRange: "260 – 420 GSM Bull Denim, Ripstop & Poly-Cotton Twill",
+    tag: "Uniforms, cargo, heavy twill",
+    gsmRange: "260 to 420 GSM Bull Denim, Ripstop & Poly-Cotton Twill",
     moq: "100 pcs / style",
     description:
       "Bar-tacked stress points, triple-stitched felled seams, industrial hospitality/medical uniforms and custom brass/nickel hardware.",
-    image:
-      "https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=900&q=85",
-    alt: "Heavyweight denim and utility workwear garments with reinforced stitching",
+    image: "/images/private-label-finishing.jpg",
+    alt: "Heavyweight denim and utility workwear trims with reinforced stitching",
   },
 ];
 
@@ -245,7 +240,7 @@ export interface FacilityHighlight {
 
 export const facilityHighlights: FacilityHighlight[] = [
   {
-    code: "DIVISION 01 · BULK SEWING FLOOR",
+    code: "Division 01: Bulk sewing floor",
     name: "Surulere Cut-and-Sew Production Floor",
     location: "1 Alawode Street, Surulere, Lagos",
     focus: "High-Volume Cut-and-Sew, Knitwear, Streetwear & Structured Tailoring Lines",
@@ -255,7 +250,7 @@ export const facilityHighlights: FacilityHighlight[] = [
     alt: "Surulere production floor with Nigerian master tailors at industrial sewing stations",
   },
   {
-    code: "DIVISION 02 · PATTERN & SAMPLE STUDIO",
+    code: "Division 02: Pattern & sample studio",
     name: "CAD Pattern, Grading & Sample Atelier",
     location: "1 Alawode Street, Surulere, Lagos",
     focus: "CAD Pattern Drafting, First Fit Samples, Luxury Resortwear & Client Fittings",
@@ -265,7 +260,7 @@ export const facilityHighlights: FacilityHighlight[] = [
     alt: "Surulere fashion atelier showroom with olive linen blazers and resortwear on brass rail",
   },
   {
-    code: "DIVISION 03 · AQL 2.5 QC & FINISHING BAY",
+    code: "Division 03: AQL 2.5 QC & finishing bay",
     name: "Quality Assurance & Export Finishing Bay",
     location: "1 Alawode Street, Surulere, Lagos",
     focus: "36-Point AQL 2.5 Inspection, Vacuum Steam Pressing, Private-Label Tagging & Dispatch",
@@ -285,7 +280,7 @@ export const productionFaqs: FaqItem[] = [
   {
     question: "What is your Minimum Order Quantity (MOQ) for bulk production?",
     answer:
-      "Our standard MOQ is 50 pieces per style (which can be split across XS–XXL sizes, e.g., 10 S, 20 M, 15 L, 5 XL). For corporate uniforms and private-label woven label runs, we recommend 100+ pieces to unlock volume tier discounts between 3% and 18%.",
+      "Our standard MOQ is 50 pieces per style (which can be split across XS to XXL sizes, e.g., 10 S, 20 M, 15 L, 5 XL). For corporate uniforms and private-label woven label runs, we recommend 100+ pieces to unlock volume tier discounts between 3% and 18%.",
   },
   {
     question: "Do I need a digital tech pack before requesting a quote?",

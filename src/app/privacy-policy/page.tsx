@@ -6,7 +6,6 @@ export default function PrivacyPolicy() {
       <section className="policy-section section-wrap" id="privacy-policy">
         <div className="section-heading">
           <div>
-            <div className="section-kicker">06 / PRIVACY POLICY</div>
             <h2>Privacy Policy</h2>
           </div>
         </div>

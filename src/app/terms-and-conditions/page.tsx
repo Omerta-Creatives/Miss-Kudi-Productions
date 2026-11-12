@@ -6,7 +6,6 @@ export default function TermsAndConditions() {
       <section className="policy-section section-wrap" id="terms-and-conditions">
         <div className="section-heading">
           <div>
-            <div className="section-kicker">08 / TERMS & CONDITIONS</div>
             <h2>Terms & Conditions</h2>
           </div>
         </div>

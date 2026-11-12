@@ -2,9 +2,9 @@ import React, { Suspense } from "react";
 import AuthPortalClient from "../components/AuthPortalClient";
 
 export const metadata = {
-  title: "Reset Factory Password — Miss Kudi Productions Operations OS",
+  title: "Reset Factory Password · Miss Kudi Productions",
   description:
-    "Verify a 6-digit one-time code to reset or initialize your Miss Kudi Productions Admin, Superadmin, or Artisan Floor Staff password.",
+    "Verify a 6-digit recovery code to reset or initialize your Miss Kudi Productions Admin, Superadmin, or Artisan Floor Staff password.",
 };
 
 export default function ResetPasswordPage() {

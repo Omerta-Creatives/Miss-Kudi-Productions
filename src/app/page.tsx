@@ -13,17 +13,14 @@ export default function Home() {
 
   return (
     <main>
-      {/* LAYOUT FAMILY A: Fullscreen 3D-Perspective Production Journey Hero Slider */}
       <AnimatedHero />
 
-      {/* LAYOUT FAMILY B: Architectural Manifesto + Collapsed Hairline Telemetry Ledger */}
       <section className="intro section-wrap" id="about">
         <div className="taste-manifesto-grid">
           <div className="taste-manifesto-index">
-            <span className="section-kicker mono">01 / MANIFESTO</span>
             <span className="taste-index-rule" />
-            <span className="mono" style={{ fontSize: 10, color: "var(--muted)" }}>
-              SURULERE, LAGOS · EST. 2018
+            <span className="mono mkp-muted-text" style={{ fontSize: 12 }}>
+              Surulere, Lagos, est. 2018
             </span>
           </div>
 
@@ -31,23 +28,23 @@ export default function Home() {
             <h2>
               Built for brands.
               <br />
-              <span>Ready for the next run.</span>
+              Ready for the next run.
             </h2>
             <div className="taste-hairline-ledger" style={{ marginTop: 32 }}>
               <div className="taste-ledger-cell">
-                <span className="ticket-label">MONTHLY CAPACITY</span>
+                <span className="ticket-label">Monthly capacity</span>
                 <strong className="mono">35,500+ Pcs</strong>
                 <small>1 Alawode St, Surulere hub</small>
               </div>
               <div className="taste-ledger-cell">
-                <span className="ticket-label">QUALITY BENCHMARK</span>
+                <span className="ticket-label">Quality benchmark</span>
                 <strong className="mono">99.4% Yield</strong>
                 <small>AQL 2.5 36-point inspection</small>
               </div>
               <div className="taste-ledger-cell">
-                <span className="ticket-label">MOQ FLEXIBILITY</span>
-                <strong className="mono">50 – 5,000+</strong>
-                <small>Units per style (XS–XXL)</small>
+                <span className="ticket-label">MOQ flexibility</span>
+                <strong className="mono">50 to 5,000+</strong>
+                <small>Units per style (XS to XXL)</small>
               </div>
             </div>
           </div>
@@ -67,25 +64,23 @@ export default function Home() {
             </p>
             <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginTop: 12 }}>
               <Link className="underlined-link" href="/about">
-                Explore Our Surulere Facility <span>↗</span>
+                Explore Surulere Facility
               </Link>
               <Link className="underlined-link" href="/quote">
-                Calculate MOQ &amp; Pro-Forma Quote <span>→</span>
+                Calculate MOQ Quote
               </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* LAYOUT FAMILY C: 12-Column Asymmetrical Spanning Bento Grid (7+5 / 5+7, 0 Orphan Cells) */}
       <section className="capabilities section-wrap" id="capabilities">
         <div className="section-heading">
           <div>
-            <div className="section-kicker mono">02 / CAPABILITIES BENTO</div>
             <h2>
               Manufacturing that
               <br />
-              <em>moves your brand forward.</em>
+              moves your brand forward.
             </h2>
           </div>
           <p>
@@ -108,7 +103,8 @@ export default function Home() {
                     alt={service.alt}
                     width={640}
                     height={460}
-                    loading="lazy"
+                    fetchPriority={index === 0 ? "high" : "auto"}
+                    loading={index === 0 ? "eager" : "lazy"}
                     decoding="async"
                     className="taste-bento-img"
                   />
@@ -116,8 +112,8 @@ export default function Home() {
                   <span className="service-moq-pill mono">{service.moqLabel}</span>
                 </figure>
                 <div className="taste-bento-body">
-                  <div className="service-role-kicker mono">{service.artisanRole}</div>
                   <h3>{service.title}</h3>
+                  <div className="service-role-kicker mono">{service.artisanRole}</div>
                   <p>{service.copy}</p>
                   <ul className="service-deliverables-list">
                     {service.deliverables.map((item) => (
@@ -126,7 +122,7 @@ export default function Home() {
                   </ul>
                   <div className="taste-bento-footer mono">
                     <span>{service.leadTimeLabel}</span>
-                    <Link href="/quote">Configure Run →</Link>
+                    <Link href="/quote">Configure Run</Link>
                   </div>
                 </div>
               </article>
@@ -149,20 +145,18 @@ export default function Home() {
             order.
           </p>
           <Link href="/services" className="button button-dark">
-            Explore Full Capabilities &amp; Specs <span>→</span>
+            Explore Capabilities
           </Link>
         </div>
       </section>
 
-      {/* LAYOUT FAMILY D: Full-Width Editorial Specification Index Ledger */}
       <section className="section-wrap" style={{ paddingTop: 92, paddingBottom: 92 }}>
         <div className="section-heading">
           <div>
-            <div className="section-kicker mono">03 / SILHOUETTE &amp; GSM SPECIFICATION INDEX</div>
             <h2>
               Engineered for every
               <br />
-              <em>silhouette &amp; fabric weight.</em>
+              silhouette &amp; fabric weight.
             </h2>
           </div>
           <p>
@@ -174,10 +168,10 @@ export default function Home() {
         <div className="taste-spec-index-ledger">
           {garmentCategories.map((cat, idx) => (
             <article key={cat.title} className="taste-spec-row">
-              <div className="taste-spec-num mono">0{idx + 1}</div>
+              <span className="taste-spec-num mono">Item 0{idx + 1}</span>
               <div className="taste-spec-title-col">
-                <span className="taste-spec-tag mono">{cat.tag}</span>
                 <h3>{cat.title}</h3>
+                <span className="taste-spec-tag mono">{cat.tag}</span>
               </div>
               <div className="taste-spec-desc-col">
                 <p>{cat.description}</p>
@@ -201,15 +195,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* LAYOUT FAMILY E: Dark Architectural Blueprint Pipeline */}
       <section className="process-section" id="process">
         <div className="process-inner section-wrap">
-          <div className="section-kicker mono">04 / FIVE-STAGE FLOOR PIPELINE</div>
           <div className="process-heading">
             <h2>
               From your brief
               <br />
-              to <em>bulk production.</em>
+              to bulk production.
             </h2>
             <p>
               A transparent 5-stage pipeline connects our Pattern Studio, Cutting Tables, Sewing
@@ -219,42 +211,36 @@ export default function Home() {
           <div className="taste-blueprint-steps">
             {steps.map(([number, title, copy]) => (
               <article className="taste-blueprint-step" key={number}>
-                <div className="taste-blueprint-top mono">
-                  <span>STAGE {number}</span>
-                  <span>AQL GATE ✓</span>
-                </div>
                 <h3>{title}</h3>
+                <div className="taste-blueprint-top mono">
+                  <span>Stage {number}</span>
+                  <span>AQL 2.5 gate</span>
+                </div>
                 <p>{copy}</p>
               </article>
             ))}
           </div>
           <div style={{ marginTop: 42, display: "flex", gap: 16, flexWrap: "wrap" }}>
             <Link className="button button-light" href="/process">
-              Inspect Detailed 5-Stage Workflow <span>↗</span>
+              5-Stage Workflow
             </Link>
-            <Link
-              className="button"
-              href="/quote"
-              style={{ border: "1px solid rgba(255,255,255,0.35)", color: "#fff" }}
-            >
-              Configure Production Quote <span>→</span>
+            <Link className="button hero-fs-btn-glass" href="/quote">
+              Configure Quote
             </Link>
           </div>
         </div>
       </section>
 
-      {/* LAYOUT FAMILY F: Asymmetrical Flagship Spotlight (1 Dominant + 2 Stacked Secondary) */}
       <section
-        className="section-wrap"
-        style={{ paddingTop: 92, paddingBottom: 92, background: "#f2ede4" }}
+        className="section-wrap mkp-surface-warm"
+        style={{ paddingTop: 92, paddingBottom: 92 }}
       >
         <div className="section-heading">
           <div>
-            <div className="section-kicker mono">05 / SURULERE MANUFACTURING HUB</div>
             <h2>
               Three specialized divisions.
               <br />
-              <em>Under one roof in Surulere.</em>
+              Under one roof in Surulere.
             </h2>
           </div>
           <p>
@@ -264,7 +250,6 @@ export default function Home() {
         </div>
 
         <div className="taste-plant-spotlight-grid">
-          {/* Dominant Left Flagship Plant */}
           <article className="taste-plant-flagship">
             <figure className="taste-plant-flagship-figure">
               <img
@@ -278,7 +263,15 @@ export default function Home() {
               <span className="facility-code-badge mono">{flagshipPlant.code}</span>
             </figure>
             <div className="taste-plant-flagship-body">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  gap: 12,
+                  flexWrap: "wrap",
+                }}
+              >
                 <h3>{flagshipPlant.name}</h3>
                 <span className="facility-location mono">{flagshipPlant.location}</span>
               </div>
@@ -290,7 +283,6 @@ export default function Home() {
             </div>
           </article>
 
-          {/* Stacked Right Atelier & Finishing Depot */}
           <div className="taste-plant-secondary-stack">
             {secondaryPlants.map((plant) => (
               <article key={plant.code} className="taste-plant-secondary-card">
@@ -306,8 +298,8 @@ export default function Home() {
                   <span className="facility-code-badge mono">{plant.code}</span>
                 </figure>
                 <div className="taste-plant-secondary-body">
-                  <span className="facility-location mono">{plant.location}</span>
                   <h3>{plant.name}</h3>
+                  <span className="facility-location mono">{plant.location}</span>
                   <p>{plant.focus}</p>
                   <div className="facility-metrics-row mono">
                     <span>{plant.machines}</span>
@@ -320,18 +312,22 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 06 / PRODUCTION FAQ & DEDICATED QUOTE STUDIO CTA */}
       <section className="section-wrap home-conversion-section">
         <div className="home-conversion-grid">
-          {/* Left: Frequently Asked Production Questions */}
           <div className="home-faq-column">
-            <div className="section-kicker mono">06 / PRODUCTION FAQS &amp; ONBOARDING</div>
-            <h2 style={{ marginTop: 14, marginBottom: 14 }}>
-              Everything you need to
+            <h2 style={{ marginTop: 0, marginBottom: 14 }}>
+              Questions before your
               <br />
-              <em>launch your next run.</em>
+              production run.
             </h2>
-            <p style={{ color: "var(--text-secondary)", fontSize: 13.5, lineHeight: 1.8, marginBottom: 24 }}>
+            <p
+              style={{
+                color: "var(--text-secondary)",
+                fontSize: 13.5,
+                lineHeight: 1.8,
+                marginBottom: 24,
+              }}
+            >
               Whether you are producing a 50-piece debut capsule or a 5,000-unit retail restock,
               our merchandising and pattern studios guide every step.
             </p>
@@ -353,7 +349,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right: Dedicated Quote Studio & Grading Matrix Card */}
           <aside className="home-quote-cta-card" aria-label="Start a Production Quote">
             <figure className="home-quote-cta-figure">
               <img
@@ -365,43 +360,40 @@ export default function Home() {
                 decoding="async"
               />
               <div className="home-quote-cta-badges mono">
-                <span>INSTANT PRO-FORMA QUOTE</span>
-                <span>MOQ 50 – 5,000+ PCS</span>
+                <span>Instant pro-forma quote</span>
+                <span>MOQ 50 to 5,000+ pcs</span>
               </div>
             </figure>
 
             <div className="home-quote-cta-body">
-              <span className="section-kicker mono" style={{ color: "#d4af37" }}>
-                DEDICATED QUOTE &amp; COSTING STUDIO
-              </span>
               <h3>Ready to cost your collection &amp; generate a Job Ticket?</h3>
               <p>
                 Use our interactive Quote Calculator to configure your garment category, exact unit
-                volume, and XS–XXL size breakdown. Receive an instant pro-forma estimate, fabric
+                volume, and XS to XXL size breakdown. Receive an instant pro-forma estimate, fabric
                 yardage requirement, and printable Factory Job Ticket.
               </p>
 
               <div className="home-quote-cta-perks mono">
                 <div>
-                  <span>VOLUME DISCOUNTS</span>
-                  <strong>3% – 18% B2B Tier</strong>
+                  <span>Volume discounts</span>
+                  <strong>3% to 18% B2B Tier</strong>
                 </div>
                 <div>
-                  <span>TURNAROUND</span>
-                  <strong>3 – 5 Weeks</strong>
+                  <span>Turnaround</span>
+                  <strong>3 to 5 Weeks</strong>
                 </div>
                 <div>
-                  <span>QUALITY STANDARD</span>
-                  <strong>ISO / AQL 2.5</strong>
+                  <span>Quality standard</span>
+                  <strong>AQL 2.5 Verified</strong>
                 </div>
               </div>
 
               <div className="home-quote-cta-actions">
                 <Link className="button hero-fs-btn-gold" href="/quote">
-                  Open Production Quote Studio <span>↗</span>
+                  Open Quote Studio
                 </Link>
                 <Link className="button hero-fs-btn-glass" href="/size-charts">
-                  Size &amp; Ratio Calculator <span>⊞</span>
+                  Size Calculator
                 </Link>
               </div>
             </div>

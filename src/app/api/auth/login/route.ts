@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
           matchedUser.name,
           matchedUser.accessTier.toUpperCase(),
           matchedUser.email,
-          `Signed in to Operations OS (${
+          `Signed in to Miss Kudi Productions (${
             rememberMe ? "30-day workstation session" : "8-hour floor shift"
           }).`,
         ]

@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { processStages } from "../data";
+import { UiIcon } from "../components/UiIcon";
 
 export default function Process() {
   return (
     <main>
-      {/* Architectural Dark-Olive Editorial Hero Stage */}
       <section className="marketing-stage-hero">
         <img
           src="/images/pattern-cutting-studio.jpg"
@@ -20,67 +20,63 @@ export default function Process() {
         <div className="marketing-stage-inner section-wrap">
           <div className="marketing-stage-grid">
             <div className="marketing-stage-copy">
-              <div className="hero-fs-badges" style={{ marginBottom: 18 }}>
-                <span className="hero-fs-chip-primary mono">
-                  03 / HOW WE WORK · 5-STAGE PIPELINE
-                </span>
-                <span className="hero-fs-chip-outline mono">
-                  QUALITY-GATED MILESTONES
-                </span>
-              </div>
-
               <h1 className="hero-fs-title">
                 From your brief
                 <br />
-                <em>to bulk production.</em>
+                to bulk production.
               </h1>
 
               <p className="hero-fs-description">
-                Every Miss Kudi Productions order at our Surulere facility travels through five
-                documented, quality-gated stages · connecting our Pattern Studio, Cutting Tables,
-                Sewing Lines, and AQL 2.5 Finishing Bay into one continuous manufacturing journey.
+                Five quality-gated stages from pattern studio and cutting tables to AQL finishing.
               </p>
+
+              <div className="hero-fs-badges" style={{ marginBottom: 20 }}>
+                <span className="hero-fs-chip-primary mono">
+                  How we work: 5-stage pipeline
+                </span>
+                <span className="hero-fs-chip-outline mono">
+                  Quality-gated milestones
+                </span>
+              </div>
 
               <div className="hero-fs-actions">
                 <Link className="button hero-fs-btn-gold" href="/quote">
-                  Start Stage 01 Brief <span>↗</span>
+                  Start Stage 01
                 </Link>
                 <Link className="button hero-fs-btn-glass" href="/size-charts">
-                  Size &amp; Ratio Calculator <span>⊞</span>
+                  Size Calculator
                 </Link>
               </div>
             </div>
 
             <div className="marketing-stage-card">
               <div className="marketing-stage-card-head mono">
-                <span>FIVE-STAGE FLOOR TIMELINE</span>
-                <span>3 – 5 WEEKS TOTAL</span>
+                <span>Five-stage floor timeline</span>
+                <span>3 to 5 weeks total</span>
               </div>
               <div className="marketing-stage-metrics">
                 <div>
-                  <span className="mono">STAGES 01 – 02</span>
-                  <strong className="mono">Days 1 – 7</strong>
+                  <span className="mono">Stages 01 to 02</span>
+                  <strong className="mono">Days 1 to 7</strong>
                   <small>Brief Intake, CAD Pattern &amp; Costing</small>
                 </div>
                 <div>
-                  <span className="mono">STAGE 03</span>
+                  <span className="mono">Stage 03</span>
                   <strong className="mono">Week 2</strong>
                   <small>PPS Sign-Off &amp; Multi-Ply Cutting</small>
                 </div>
                 <div>
-                  <span className="mono">STAGES 04 – 05</span>
-                  <strong className="mono">Weeks 3 – 5</strong>
+                  <span className="mono">Stages 04 to 05</span>
+                  <strong className="mono">Weeks 3 to 5</strong>
                   <small>Bulk Sewing, AQL 2.5 QC &amp; Dispatch</small>
                 </div>
               </div>
               <a href="#stage-01" className="marketing-stage-scroll mono">
-                <span>JUMP TO STAGE-BY-STAGE JOURNEY</span>
-                <span>↓</span>
+                <span>Jump to stage-by-stage journey</span>
               </a>
             </div>
           </div>
 
-          {/* Quick Stage Jump Ribbon */}
           <nav className="process-jump-ribbon" aria-label="Jump to production stage">
             {processStages.map((stage) => (
               <a
@@ -88,7 +84,7 @@ export default function Process() {
                 href={`#stage-${stage.number}`}
                 className="process-jump-pill mono"
               >
-                <span>STAGE {stage.number}</span>
+                <span>Stage {stage.number}</span>
                 <strong>{stage.title}</strong>
               </a>
             ))}
@@ -96,15 +92,13 @@ export default function Process() {
         </div>
       </section>
 
-      {/* Detailed 5-Stage Connected Journey Timeline */}
       <section className="section-wrap" style={{ paddingTop: 84, paddingBottom: 96 }}>
         <div className="section-heading">
           <div>
-            <div className="section-kicker mono">STAGE-BY-STAGE EXECUTION</div>
             <h2>
               Transparent milestones at
               <br />
-              <em>every station on the floor.</em>
+              every station on the floor.
             </h2>
           </div>
           <p>
@@ -121,6 +115,9 @@ export default function Process() {
               className="process-stage-card"
             >
               <div className="process-stage-copy">
+                <h3 style={{ fontSize: "clamp(20px, 2.2vw, 25px)", margin: "0 0 10px" }}>
+                  {stage.number}. {stage.title}
+                </h3>
                 <div
                   style={{
                     display: "flex",
@@ -136,17 +133,14 @@ export default function Process() {
                     className="mono"
                     style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ink)" }}
                   >
-                    ⏱ {stage.duration}
+                    <UiIcon name="clock" size={14} /> {stage.duration}
                   </span>
                 </div>
-                <h3 style={{ fontSize: "clamp(20px, 2.2vw, 25px)", margin: "0 0 6px" }}>
-                  {stage.number}. {stage.title}
-                </h3>
                 <div
+                  className="mkp-muted-text"
                   style={{
                     fontSize: 11.5,
                     fontWeight: 700,
-                    color: "#6c5d4c",
                     marginBottom: 12,
                   }}
                 >
@@ -163,7 +157,7 @@ export default function Process() {
                   {stage.copy}
                 </p>
                 <div className="ticket-label" style={{ marginBottom: 8 }}>
-                  MANDATORY STAGE DELIVERABLES &amp; QC GATES
+                  Mandatory stage deliverables &amp; QC gates
                 </div>
                 <ul className="service-deliverables-list">
                   {stage.checkpoints.map((cp) => (
@@ -192,9 +186,6 @@ export default function Process() {
 
         <div className="marketing-bottom-cta-banner">
           <div>
-            <span className="section-kicker mono" style={{ color: "#d4af37" }}>
-              READY TO ENTER STAGE 01?
-            </span>
             <h3>Generate your instant Job Code &amp; Pro-Forma Quote.</h3>
             <p>
               Includes live MOQ volume discounts, fabric consumption yardage and a printable
@@ -203,10 +194,10 @@ export default function Process() {
           </div>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <Link className="button hero-fs-btn-gold" href="/quote">
-              Configure Production Quote <span>↗</span>
+              Configure Quote
             </Link>
             <Link className="button hero-fs-btn-glass" href="/size-charts">
-              Size &amp; Ratio Calculator <span>⊞</span>
+              Size Calculator
             </Link>
           </div>
         </div>

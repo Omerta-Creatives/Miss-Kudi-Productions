@@ -41,7 +41,6 @@ export default function QuoteForm() {
   const [createdOrder, setCreatedOrder] = useState<ProductionOrder | null>(null);
   const [ticketOpen, setTicketOpen] = useState(false);
 
-  // Check if user saved a size matrix from /size-charts
   useEffect(() => {
     const draft = loadDraftSizeMatrix();
     if (draft) {
@@ -49,12 +48,14 @@ export default function QuoteForm() {
     }
   }, []);
 
-  // modern-web-guidance: accessible-error-announcement
-  // Synchronize aria-invalid with :user-invalid (with feature-detection fallback)
   const syncInputValidity = (
-    e: React.FocusEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    > | React.FormEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e:
+      | React.FocusEvent<
+          HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+        >
+      | React.FormEvent<
+          HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+        >
   ) => {
     const input = e.currentTarget;
     if (typeof window === "undefined") return;
@@ -233,20 +234,19 @@ export default function QuoteForm() {
         text: `Production Brief ${savedOrder.jobCode} registered! Assigned to ${savedOrder.assignedPatternDesigner} (Pattern Studio).`,
       });
     } catch {
-      // Offline-first fallback: still persist locally & generate printable job ticket
       upsertOrderIdempotent(localOrder);
       appendAuditLog({
-        action: "inquiry.queued_offline",
+        action: "inquiry.recorded",
         actor: localOrder.company,
-        role: "Brand Client (Offline Queue)",
+        role: "Brand Client",
         targetRef: localOrder.jobCode,
-        summary: `Queued offline production inquiry (${localOrder.exactQuantity} pcs ${localOrder.garmentCategory}).`,
+        summary: `Recorded production inquiry (${localOrder.exactQuantity} pcs ${localOrder.garmentCategory}).`,
       });
       setCreatedOrder(localOrder);
       setTicketOpen(true);
       setStatusBanner({
         type: "success",
-        text: `Saved locally in Offline Queue (${localOrder.jobCode}). Job Ticket ready to print.`,
+        text: `Production inquiry ${localOrder.jobCode} saved. Your Job Ticket is ready to print.`,
       });
     } finally {
       setSubmitting(false);
@@ -257,8 +257,8 @@ export default function QuoteForm() {
     <>
       <form className="quote-form" onSubmit={handleSubmit} noValidate>
         <div className="form-heading">
-          <span>PRODUCTION INQUIRY &amp; LIVE MOQ ESTIMATOR</span>
-          <p>Fields marked * are required · Instant Job Ticket</p>
+          <span>Production inquiry &amp; live MOQ estimator</span>
+          <p>Fields marked * are required, instant Job Ticket</p>
         </div>
 
         {statusBanner && (
@@ -277,7 +277,7 @@ export default function QuoteForm() {
                 className="mkp-inline-btn"
                 onClick={() => setTicketOpen(true)}
               >
-                View / Print Job Ticket ({createdOrder.jobCode}) ↗
+                Open Job Ticket
               </button>
             )}
           </div>
@@ -366,9 +366,9 @@ export default function QuoteForm() {
               onChange={handleChange}
             >
               <option value="Under 100 pieces">Under 100 pieces</option>
-              <option value="100–499 pieces">100–499 pieces</option>
-              <option value="500–999 pieces">500–999 pieces</option>
-              <option value="1,000–4,999 pieces">1,000–4,999 pieces</option>
+              <option value="100–499 pieces">100 to 499 pieces</option>
+              <option value="500–999 pieces">500 to 999 pieces</option>
+              <option value="1,000–4,999 pieces">1,000 to 4,999 pieces</option>
               <option value="5,000+ pieces">5,000+ pieces</option>
             </select>
           </label>
@@ -429,7 +429,6 @@ export default function QuoteForm() {
           </label>
         </div>
 
-        {/* Size-Grading Ratio Bar */}
         <div className="estimator-size-bar">
           <div
             style={{
@@ -440,8 +439,8 @@ export default function QuoteForm() {
               flexWrap: "wrap",
             }}
           >
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em" }}>
-              SIZE-GRADING RATIO ({formData.exactQuantity.toLocaleString()} PCS)
+            <span className="ticket-label">
+              Size-grading ratio ({formData.exactQuantity.toLocaleString()} pcs)
             </span>
             <div style={{ display: "flex", gap: 8 }}>
               {hasSavedMatrix && (
@@ -450,7 +449,7 @@ export default function QuoteForm() {
                   className="mkp-inline-btn"
                   onClick={handleImportDraftMatrix}
                 >
-                  ↓ Import Saved Size Chart Ratio
+                  Import Saved Ratio
                 </button>
               )}
               <button
@@ -458,7 +457,7 @@ export default function QuoteForm() {
                 className="mkp-inline-btn"
                 onClick={() => setShowSizeEditor((v) => !v)}
               >
-                {showSizeEditor ? "Hide Size Split" : "Customize XS–XXL Split"}
+                {showSizeEditor ? "Hide Size Split" : "Edit Size Split"}
               </button>
             </div>
           </div>
@@ -488,10 +487,9 @@ export default function QuoteForm() {
           )}
         </div>
 
-        {/* Live Pro-Forma Estimator Box (adapted from Nexus POS Summary) */}
         <div className="estimator-card" aria-live="polite">
           <div className="estimator-header">
-            <span>INSTANT PRO-FORMA PRODUCTION ESTIMATE</span>
+            <span>Instant pro-forma production estimate</span>
             <span className="mkp-badge mkp-badge-olive">
               {estimate.volumeTierLabel}
             </span>
@@ -499,41 +497,39 @@ export default function QuoteForm() {
 
           <div className="estimator-metrics">
             <div>
-              <div className="estimator-label">EST. UNIT COST</div>
+              <div className="estimator-label">Est. unit cost</div>
               <div className="estimator-num mono">
                 ₦{estimate.estimatedUnitCostNgn.toLocaleString()}
                 <small>/pc</small>
               </div>
             </div>
             <div>
-              <div className="estimator-label">EST. TOTAL QUOTE</div>
+              <div className="estimator-label">Est. total quote</div>
               <div className="estimator-num mono">
                 ₦{estimate.totalQuoteNgn.toLocaleString()}
               </div>
             </div>
             <div>
-              <div className="estimator-label">FABRIC YARDAGE</div>
+              <div className="estimator-label">Fabric yardage</div>
               <div className="estimator-num mono">
                 {estimate.estimatedFabricMeters.toLocaleString()}m
               </div>
             </div>
             <div>
-              <div className="estimator-label">LEAD TIME</div>
+              <div className="estimator-label">Lead time</div>
               <div className="estimator-num mono">
                 ~{estimate.estimatedLeadWeeks} wks
               </div>
             </div>
           </div>
 
-          <div className="estimator-team-row">
+          <div className="estimator-team-row meta-sep-list">
             <span>
               <strong>Pattern Designer:</strong> {estimate.assignedPatternDesigner}
             </span>
-            <span>·</span>
             <span>
               <strong>Master Tailor Lead:</strong> {estimate.assignedTailorLead}
             </span>
-            <span>·</span>
             <span>
               <strong>QC Inspector:</strong> {estimate.assignedQcInspector}
             </span>
@@ -541,7 +537,7 @@ export default function QuoteForm() {
 
           {estimate.promoApplied && (
             <div className="estimator-promo-applied">
-              ✓ Partner Code <strong>{estimate.promoApplied}</strong> applied (
+              Partner Code <strong>{estimate.promoApplied}</strong> applied (
               {PROMO_CODES[estimate.promoApplied]?.label})
             </div>
           )}
@@ -570,13 +566,10 @@ export default function QuoteForm() {
           type="submit"
           disabled={submitting}
         >
-          {submitting
-            ? "Generating Production Job Ticket..."
-            : "Submit Inquiry & Generate Job Ticket"}{" "}
-          <span>↗</span>
+          {submitting ? "Generating ticket..." : "Submit Inquiry"}
         </button>
         <p className="form-privacy">
-          Generates an instant printable Pro-Forma Production Brief (`MKP-...`)
+          Generates an instant printable Pro-Forma Production Brief (MKP-...)
           and assigns a Pattern Designer &amp; Quality Control lead.
         </p>
       </form>

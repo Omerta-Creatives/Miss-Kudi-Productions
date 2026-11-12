@@ -17,6 +17,7 @@ import {
   STAGE_METADATA,
 } from "../lib/production-os";
 import { ProductionJobTicketModal } from "../components/ProductionJobTicketModal";
+import { UiIcon } from "../components/UiIcon";
 
 const STAGE_ORDER: ProductionStage[] = [
   "01_brief",
@@ -154,26 +155,13 @@ export default function ProductionTrackerPage() {
   return (
     <main>
       <section className="section-wrap" style={{ paddingTop: 48, paddingBottom: 96 }}>
-        {/* Internal Staff & Admin Context Header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 12,
-            flexWrap: "wrap",
-            padding: "12px 16px",
-            marginBottom: 24,
-            background: "#eff3e9",
-            border: "1px solid #c3d2b0",
-          }}
-        >
+        <div className="tracker-operator-bar">
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span className="mkp-badge mkp-badge-olive">
-              IN-HOUSE PRODUCTION TRACKER
+              In-house production tracker
             </span>
             <span style={{ fontSize: 12, fontWeight: 600 }}>
-              Active Operator: <strong>{user.name}</strong> ({ACCESS_TIER_LABELS[user.accessTier]} ·{" "}
+              Active Operator: <strong>{user.name}</strong> ({ACCESS_TIER_LABELS[user.accessTier]},{" "}
               {ARTISAN_ROLE_LABELS[user.role]})
             </span>
           </div>
@@ -183,14 +171,14 @@ export default function ProductionTrackerPage() {
               className="button button-light"
               style={{ minHeight: 36, padding: "0 12px", border: "1px solid var(--line)" }}
             >
-              ← Staff / Admin Dashboard
+              Plant Console
             </Link>
             <Link
               href="/workspace"
               className="button button-light"
               style={{ minHeight: 36, padding: "0 12px", border: "1px solid var(--line)" }}
             >
-              Operations Workspace ⚙
+              <UiIcon name="settings" size={14} /> Workspace
             </Link>
             {isSuper && (
               <Link
@@ -198,7 +186,7 @@ export default function ProductionTrackerPage() {
                 className="button button-dark"
                 style={{ minHeight: 36, padding: "0 12px" }}
               >
-                Superadmin HQ ★
+                <UiIcon name="star" size={14} /> Superadmin HQ
               </Link>
             )}
           </div>
@@ -206,12 +194,8 @@ export default function ProductionTrackerPage() {
 
         <div className="section-heading" style={{ marginBottom: 28 }}>
           <div>
-            <div className="section-kicker mono">
-              INTERNAL FLOOR PIPELINE · 5-STAGE PRODUCTION ORDER TRACKER
-            </div>
             <h2>
-              Manage &amp; track runs from{" "}
-              <em>Pattern Studio to Dispatch.</em>
+              Manage &amp; track runs from Pattern Studio to Dispatch.
             </h2>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -220,10 +204,10 @@ export default function ProductionTrackerPage() {
               href="/workspace"
               style={{ border: "1px solid var(--line)" }}
             >
-              Floor Operations Workspace <span>⚙</span>
+              <UiIcon name="settings" size={14} /> Workspace
             </Link>
             <Link className="button button-dark" href="/dashboard">
-              Open Station Console <span>⊞</span>
+              Station Console
             </Link>
           </div>
         </div>
@@ -234,11 +218,10 @@ export default function ProductionTrackerPage() {
             className="mkp-banner mkp-banner-olive"
             style={{ marginBottom: 20 }}
           >
-            <span>✓ {notice}</span>
+            <span>{notice}</span>
           </div>
         )}
 
-        {/* Search & Stage Filter Bar */}
         <div className="tracker-toolbar">
           <input
             type="search"
@@ -272,21 +255,20 @@ export default function ProductionTrackerPage() {
           </div>
         </div>
 
-        {/* Orders List */}
         <div className="tracker-cards-stack">
           {filtered.length === 0 ? (
             <div className="mkp-empty-card">
               <h3>No active production runs in tracker</h3>
               <p>
-                Create a new production run from your Admin Dashboard, Operations Workspace, or
-                Quote intake to track live 5-stage progress here.
+                Create a new production run from your Plant Console, Workspace, or Quote intake to
+                track live 5-stage progress here.
               </p>
               <div style={{ marginTop: 14, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
                 <Link href="/dashboard" className="button button-dark">
-                  Go to Staff / Admin Dashboard <span>→</span>
+                  Plant Console
                 </Link>
                 <Link href="/workspace" className="button button-light" style={{ border: "1px solid var(--line)" }}>
-                  Open Operations Workspace <span>⚙</span>
+                  <UiIcon name="settings" size={14} /> Workspace
                 </Link>
               </div>
             </div>
@@ -310,21 +292,21 @@ export default function ProductionTrackerPage() {
                 <article key={order.jobCode} className="tracker-order-card">
                   <div className="tracker-card-top">
                     <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                      <h3 style={{ margin: "0 0 8px", fontSize: 20 }}>
+                        {order.company}: {order.garmentCategory} (
+                        {order.exactQuantity.toLocaleString()} pcs)
+                      </h3>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
                         <span className="mono tracker-job-code">{order.jobCode}</span>
                         <span className="mkp-badge mkp-badge-olive">
-                          STAGE {STAGE_METADATA[order.stage].stepNumber} ·{" "}
-                          {STAGE_METADATA[order.stage].shortLabel.toUpperCase()}
+                          Stage {STAGE_METADATA[order.stage].stepNumber}:{" "}
+                          {STAGE_METADATA[order.stage].shortLabel}
                         </span>
                         <span style={{ fontSize: 11, color: "var(--muted)" }}>
                           Target Delivery: <strong>{order.targetDeliveryDate}</strong>
                         </span>
                       </div>
-                      <h3 style={{ margin: "8px 0 4px", fontSize: 20 }}>
-                        {order.company} — {order.garmentCategory} (
-                        {order.exactQuantity.toLocaleString()} pcs)
-                      </h3>
-                      <p style={{ margin: 0, fontSize: 12, color: "#5f5b54", maxWidth: 780 }}>
+                      <p className="mkp-muted-text" style={{ margin: 0, fontSize: 12, maxWidth: 780 }}>
                         {order.details}
                       </p>
                     </div>
@@ -341,7 +323,7 @@ export default function ProductionTrackerPage() {
                           }}
                           onClick={() => handleIncrementUnits(order, 25)}
                         >
-                          +25 Sewn &amp; QC Units
+                          +25 Sewn Units
                         </button>
                       )}
                       {canAdvance && nextStageMeta && (
@@ -356,7 +338,7 @@ export default function ProductionTrackerPage() {
                           }}
                           onClick={() => handleAdvanceStage(order)}
                         >
-                          Advance → {nextStageMeta.shortLabel}
+                          Advance Stage
                         </button>
                       )}
                       <button
@@ -368,12 +350,11 @@ export default function ProductionTrackerPage() {
                           setTicketOpen(true);
                         }}
                       >
-                        Job Ticket &amp; Spec Sheet <span>🖨</span>
+                        <UiIcon name="print" size={14} /> Job Ticket
                       </button>
                     </div>
                   </div>
 
-                  {/* 5-Stage Visual Pipeline Stepper */}
                   <div className="pipeline-stepper">
                     {STAGE_ORDER.map((st, idx) => {
                       const meta = STAGE_METADATA[st];
@@ -395,15 +376,14 @@ export default function ProductionTrackerPage() {
                     })}
                   </div>
 
-                  {/* Artisan Assignment & QC Telemetry Grid */}
                   <div className="tracker-telemetry-grid">
                     <div className="telemetry-box">
-                      <span className="ticket-label">PATTERN DESIGNER</span>
+                      <span className="ticket-label">Pattern designer</span>
                       <strong>{order.assignedPatternDesigner}</strong>
                       <small>Input: {order.specificationsReady}</small>
                     </div>
                     <div className="telemetry-box">
-                      <span className="ticket-label">MASTER TAILOR / SEWING LEAD</span>
+                      <span className="ticket-label">Master tailor / sewing lead</span>
                       <strong>{order.assignedTailorLead}</strong>
                       <small>
                         Sewn: {order.unitsSewn.toLocaleString()} /{" "}
@@ -411,20 +391,20 @@ export default function ProductionTrackerPage() {
                       </small>
                     </div>
                     <div className="telemetry-box">
-                      <span className="ticket-label">QUALITY CONTROL (QC)</span>
+                      <span className="ticket-label">Quality control (QC)</span>
                       <strong>{order.assignedQcInspector}</strong>
                       <small>
                         Passed QC: {order.unitsPassedQc.toLocaleString()} pcs ({qcYield}% Yield
-                        {order.unitsRework > 0 ? ` · ${order.unitsRework} rework` : ""})
+                        {order.unitsRework > 0 ? `, ${order.unitsRework} rework` : ""})
                       </small>
                     </div>
                     <div className="telemetry-box">
-                      <span className="ticket-label">FABRIC &amp; PRO-FORMA VALUE</span>
+                      <span className="ticket-label">Fabric &amp; pro-forma value</span>
                       <strong className="mono">
                         ₦{order.totalQuoteNgn.toLocaleString()}
                       </strong>
                       <small>
-                        {order.estimatedFabricMeters.toLocaleString()}m allocated ·{" "}
+                        {order.estimatedFabricMeters.toLocaleString()}m allocated,{" "}
                         ₦{order.estimatedUnitCostNgn.toLocaleString()}/pc
                       </small>
                     </div>

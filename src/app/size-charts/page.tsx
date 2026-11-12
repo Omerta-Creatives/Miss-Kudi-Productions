@@ -19,19 +19,19 @@ interface SizeRow {
 }
 
 const SIZE_CHART_DATA: SizeRow[] = [
-  { category: "Women – Tops & Dresses", size: "XS", chestIn: [31, 32], waistIn: [24, 25], hipIn: [34, 35], garmentLengthIn: 24.5 },
-  { category: "Women – Tops & Dresses", size: "S", chestIn: [33, 34], waistIn: [26, 27], hipIn: [36, 37], garmentLengthIn: 25.0 },
-  { category: "Women – Tops & Dresses", size: "M", chestIn: [35, 36], waistIn: [28, 29], hipIn: [38, 39], garmentLengthIn: 25.5 },
-  { category: "Women – Tops & Dresses", size: "L", chestIn: [37, 39], waistIn: [30, 32], hipIn: [40, 42], garmentLengthIn: 26.2 },
-  { category: "Women – Tops & Dresses", size: "XL", chestIn: [40, 42], waistIn: [33, 35], hipIn: [43, 45], garmentLengthIn: 26.8 },
-  { category: "Women – Tops & Dresses", size: "XXL", chestIn: [43, 45], waistIn: [36, 38], hipIn: [46, 48], garmentLengthIn: 27.4 },
+  { category: "Women: Tops & Dresses", size: "XS", chestIn: [31, 32], waistIn: [24, 25], hipIn: [34, 35], garmentLengthIn: 24.5 },
+  { category: "Women: Tops & Dresses", size: "S", chestIn: [33, 34], waistIn: [26, 27], hipIn: [36, 37], garmentLengthIn: 25.0 },
+  { category: "Women: Tops & Dresses", size: "M", chestIn: [35, 36], waistIn: [28, 29], hipIn: [38, 39], garmentLengthIn: 25.5 },
+  { category: "Women: Tops & Dresses", size: "L", chestIn: [37, 39], waistIn: [30, 32], hipIn: [40, 42], garmentLengthIn: 26.2 },
+  { category: "Women: Tops & Dresses", size: "XL", chestIn: [40, 42], waistIn: [33, 35], hipIn: [43, 45], garmentLengthIn: 26.8 },
+  { category: "Women: Tops & Dresses", size: "XXL", chestIn: [43, 45], waistIn: [36, 38], hipIn: [46, 48], garmentLengthIn: 27.4 },
 
-  { category: "Men – Shirts & Tops", size: "XS", chestIn: [34, 35], waistIn: [28, 29], hipIn: [35, 36], garmentLengthIn: 27.5 },
-  { category: "Men – Shirts & Tops", size: "S", chestIn: [36, 37], waistIn: [30, 31], hipIn: [37, 38], garmentLengthIn: 28.2 },
-  { category: "Men – Shirts & Tops", size: "M", chestIn: [38, 40], waistIn: [32, 34], hipIn: [39, 41], garmentLengthIn: 29.0 },
-  { category: "Men – Shirts & Tops", size: "L", chestIn: [41, 43], waistIn: [35, 37], hipIn: [42, 44], garmentLengthIn: 29.8 },
-  { category: "Men – Shirts & Tops", size: "XL", chestIn: [44, 46], waistIn: [38, 40], hipIn: [45, 47], garmentLengthIn: 30.5 },
-  { category: "Men – Shirts & Tops", size: "XXL", chestIn: [47, 49], waistIn: [41, 43], hipIn: [48, 50], garmentLengthIn: 31.2 },
+  { category: "Men: Shirts & Tops", size: "XS", chestIn: [34, 35], waistIn: [28, 29], hipIn: [35, 36], garmentLengthIn: 27.5 },
+  { category: "Men: Shirts & Tops", size: "S", chestIn: [36, 37], waistIn: [30, 31], hipIn: [37, 38], garmentLengthIn: 28.2 },
+  { category: "Men: Shirts & Tops", size: "M", chestIn: [38, 40], waistIn: [32, 34], hipIn: [39, 41], garmentLengthIn: 29.0 },
+  { category: "Men: Shirts & Tops", size: "L", chestIn: [41, 43], waistIn: [35, 37], hipIn: [42, 44], garmentLengthIn: 29.8 },
+  { category: "Men: Shirts & Tops", size: "XL", chestIn: [44, 46], waistIn: [38, 40], hipIn: [45, 47], garmentLengthIn: 30.5 },
+  { category: "Men: Shirts & Tops", size: "XXL", chestIn: [47, 49], waistIn: [41, 43], hipIn: [48, 50], garmentLengthIn: 31.2 },
 
   { category: "Trousers & Bottoms", size: "XS", chestIn: [32, 33], waistIn: [26, 27], hipIn: [35, 36], garmentLengthIn: 39.5 },
   { category: "Trousers & Bottoms", size: "S", chestIn: [34, 35], waistIn: [28, 29], hipIn: [37, 38], garmentLengthIn: 40.0 },
@@ -50,11 +50,11 @@ const CURVE_PRESETS: Record<
     weights: { XS: 0.1, S: 0.22, M: 0.32, L: 0.22, XL: 0.1, XXL: 0.04 },
   },
   womenswear: {
-    label: "Womenswear / Resortwear Curve (XS–M Core)",
+    label: "Womenswear / Resortwear Curve (XS to M Core)",
     weights: { XS: 0.14, S: 0.28, M: 0.3, L: 0.18, XL: 0.07, XXL: 0.03 },
   },
   streetwear: {
-    label: "Streetwear / Boxy Oversized (M–XL Core)",
+    label: "Streetwear / Boxy Oversized (M to XL Core)",
     weights: { XS: 0.06, S: 0.16, M: 0.3, L: 0.28, XL: 0.14, XXL: 0.06 },
   },
 };
@@ -109,8 +109,8 @@ export default function SizeCharts() {
   };
 
   const formatRange = (rangeIn: [number, number]) => {
-    if (unit === "in") return `${rangeIn[0]}–${rangeIn[1]} in`;
-    return `${Math.round(rangeIn[0] * 2.54)}–${Math.round(
+    if (unit === "in") return `${rangeIn[0]} to ${rangeIn[1]} in`;
+    return `${Math.round(rangeIn[0] * 2.54)} to ${Math.round(
       rangeIn[1] * 2.54
     )} cm`;
   };
@@ -197,7 +197,6 @@ export default function SizeCharts() {
 
   return (
     <main>
-      {/* Architectural Dark-Olive Editorial Hero Stage */}
       <section className="marketing-stage-hero">
         <img
           src="/images/pattern-cutting-studio.jpg"
@@ -213,26 +212,24 @@ export default function SizeCharts() {
         <div className="marketing-stage-inner section-wrap">
           <div className="marketing-stage-grid">
             <div className="marketing-stage-copy">
-              <div className="hero-fs-badges" style={{ marginBottom: 18 }}>
-                <span className="hero-fs-chip-primary mono">
-                  04 / SIZE-GRADING &amp; MARKER CALCULATOR
-                </span>
-                <span className="hero-fs-chip-outline mono">
-                  XS – XXL NESTED BLOCKS
-                </span>
-              </div>
-
               <h1 className="hero-fs-title">
                 Size guide &amp;
                 <br />
-                <em>bulk grading matrix.</em>
+                bulk grading matrix.
               </h1>
 
               <p className="hero-fs-description">
-                Plan your collection&apos;s XS–XXL size curve, compute exact fabric roll yardage
-                (including 5% cutting table lay tolerance), and push your ratio directly into your
-                Production Quote.
+                Plan your XS to XXL size curve and calculate roll yardage.
               </p>
+
+              <div className="hero-fs-badges" style={{ marginBottom: 20 }}>
+                <span className="hero-fs-chip-primary mono">
+                  Size-grading &amp; marker calculator
+                </span>
+                <span className="hero-fs-chip-outline mono">
+                  XS to XXL nested blocks
+                </span>
+              </div>
 
               <div className="hero-fs-actions">
                 <button
@@ -240,36 +237,36 @@ export default function SizeCharts() {
                   className="button hero-fs-btn-gold"
                   onClick={handleSendToQuote}
                 >
-                  Attach {totalUnits.toLocaleString()} Pcs Ratio to Quote <span>↗</span>
+                  Use Ratio in Quote
                 </button>
                 <button
                   type="button"
                   className="button hero-fs-btn-glass"
                   onClick={handleExportCsv}
                 >
-                  Export Grading CSV <span>↓</span>
+                  Export Grading Sheet
                 </button>
               </div>
             </div>
 
             <div className="marketing-stage-card">
               <div className="marketing-stage-card-head mono">
-                <span>LIVE MARKER SUMMARY</span>
-                <span>{unit.toUpperCase()} SPEC</span>
+                <span>Live marker summary</span>
+                <span>{unit} spec</span>
               </div>
               <div className="marketing-stage-metrics">
                 <div>
-                  <span className="mono">TOTAL RUN QUANTITY</span>
+                  <span className="mono">Total run quantity</span>
                   <strong className="mono">{totalUnits.toLocaleString()} Pcs</strong>
                   <small>{garmentCategory}</small>
                 </div>
                 <div>
-                  <span className="mono">GRADED FABRIC YARDAGE</span>
+                  <span className="mono">Graded fabric yardage</span>
                   <strong className="mono">{totalFabricMeters.toLocaleString()} Meters</strong>
                   <small>Includes 5% lay wastage</small>
                 </div>
                 <div>
-                  <span className="mono">MEASUREMENT SYSTEM</span>
+                  <span className="mono">Measurement system</span>
                   <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
                     <button
                       type="button"
@@ -283,14 +280,13 @@ export default function SizeCharts() {
                       className={`mkp-filter-pill ${unit === "cm" ? "active" : ""}`}
                       onClick={() => setUnit("cm")}
                     >
-                      CM (cm)
+                      Centimeters (cm)
                     </button>
                   </div>
                 </div>
               </div>
               <a href="#grading-planner" className="marketing-stage-scroll mono">
-                <span>OPEN INTERACTIVE RATIO PLANNER</span>
-                <span>↓</span>
+                <span>Open interactive ratio planner</span>
               </a>
             </div>
           </div>
@@ -302,18 +298,14 @@ export default function SizeCharts() {
         id="grading-planner"
         style={{ paddingTop: 72, paddingBottom: 96 }}
       >
-        {/* Interactive Bulk Size-Ratio & Fabric Consumption Calculator */}
         <div className="grading-calculator-card">
           <div className="grading-calc-header">
             <div>
-              <span className="section-kicker mono">
-                SURULERE CAD PATTERN &amp; GRADING STUDIO
-              </span>
-              <h2 style={{ margin: "8px 0 6px", fontSize: "clamp(22px, 2.6vw, 30px)" }}>
+              <h2 style={{ margin: "0 0 6px", fontSize: "clamp(22px, 2.6vw, 30px)" }}>
                 Interactive Bulk Order Ratio &amp; Marker Consumption Planner
               </h2>
               <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>
-                Adjust individual XS–XXL quantities or apply a retail bell-curve preset.
+                Adjust individual XS to XXL quantities or apply a retail bell-curve preset.
               </p>
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -323,7 +315,7 @@ export default function SizeCharts() {
                 style={{ minHeight: 42, border: "1px solid var(--line)" }}
                 onClick={handleExportCsv}
               >
-                Export Grading CSV <span>↓</span>
+                Export Grading Sheet
               </button>
               <button
                 type="button"
@@ -331,7 +323,7 @@ export default function SizeCharts() {
                 style={{ minHeight: 42 }}
                 onClick={handleSendToQuote}
               >
-                Attach Ratio to Quote Inquiry <span>↗</span>
+                Use Ratio in Quote
               </button>
             </div>
           </div>
@@ -447,7 +439,6 @@ export default function SizeCharts() {
           </div>
         </div>
 
-        {/* Filter pills & Unit Toggle for measurement table */}
         <div
           style={{
             display: "flex",
@@ -460,14 +451,14 @@ export default function SizeCharts() {
           }}
         >
           <p className="size-chart-intro" style={{ margin: 0 }}>
-            Standard body &amp; garment block measurements ({unit.toUpperCase()}). Our
-            Pattern Designers grade custom tech packs to your brand&apos;s exact fit block.
+            Standard body &amp; garment block measurements ({unit}). Our Pattern Designers grade
+            custom tech packs to your brand&apos;s exact fit block.
           </p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {[
               "All",
-              "Women – Tops & Dresses",
-              "Men – Shirts & Tops",
+              "Women: Tops & Dresses",
+              "Men: Shirts & Tops",
               "Trousers & Bottoms",
             ].map((cat) => (
               <button
@@ -484,7 +475,6 @@ export default function SizeCharts() {
           </div>
         </div>
 
-        {/* Responsive Container-Query Table */}
         <div className="table-scroll-wrap">
           <table
             className="size-chart responsive-data-table"
@@ -533,12 +523,9 @@ export default function SizeCharts() {
 
         <div className="marketing-bottom-cta-banner">
           <div>
-            <span className="section-kicker mono" style={{ color: "#d4af37" }}>
-              RATIO READY FOR COSTING?
-            </span>
             <h3>Push your {totalUnits.toLocaleString()}-piece size breakdown to Quote Studio.</h3>
             <p>
-              Your custom XS–XXL breakdown and {totalFabricMeters.toLocaleString()}m fabric
+              Your custom XS to XXL breakdown and {totalFabricMeters.toLocaleString()}m fabric
               requirement will pre-fill automatically.
             </p>
           </div>
@@ -548,10 +535,10 @@ export default function SizeCharts() {
               className="button hero-fs-btn-gold"
               onClick={handleSendToQuote}
             >
-              Send Ratio to Quote Form <span>↗</span>
+              Send to Quote
             </button>
             <Link className="button hero-fs-btn-glass" href="/services">
-              Explore Capabilities <span>→</span>
+              Explore Capabilities
             </Link>
           </div>
         </div>

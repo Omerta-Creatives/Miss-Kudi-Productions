@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   return attachRateLimitHeaders(
     NextResponse.json({
       status: "ok",
-      platform: "Miss Kudi Productions — Operations OS",
+      platform: "Miss Kudi Productions",
       ...status,
       timestamp: new Date().toISOString(),
     }),

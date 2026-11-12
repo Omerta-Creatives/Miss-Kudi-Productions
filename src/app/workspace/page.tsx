@@ -36,6 +36,7 @@ import {
   ModalDialog,
   ProductionJobTicketModal,
 } from "../components/ProductionJobTicketModal";
+import { UiIcon } from "../components/UiIcon";
 
 type WorkspaceTab =
   | "pipeline"
@@ -299,9 +300,9 @@ export default function FactoryWorkspacePage() {
       })
       .catch(() => {});
     const logs = appendAuditLog({
-      action: "rbac.user_updated",
+      action: "team.user_updated",
       actor: "Kudi Lasisi",
-      role: "Superadmin / Admin CRUD",
+      role: "Plant Management",
       targetRef: editingArtisan.email,
       summary: `Updated ${editingArtisan.name} (${editingArtisan.accessTier.toUpperCase()} · ${ARTISAN_ROLE_LABELS[editingArtisan.role]})${nextPassword ? " and rotated login password" : ""}.`,
     });
@@ -324,9 +325,9 @@ export default function FactoryWorkspacePage() {
       { method: "DELETE" }
     ).catch(() => {});
     const logs = appendAuditLog({
-      action: "rbac.user_deleted",
+      action: "team.user_deleted",
       actor: "Kudi Lasisi",
-      role: "Superadmin / Admin CRUD",
+      role: "Plant Management",
       targetRef: art.email,
       summary: `Removed ${art.name} (${art.accessTier.toUpperCase()}) from roster.`,
     });
@@ -394,7 +395,7 @@ export default function FactoryWorkspacePage() {
     const next = clients.filter((c) => c.id !== id);
     setClients(next);
     saveBrandClients(next);
-    showToast(`Removed ${brandName} from CRM.`);
+    showToast(`Removed ${brandName} from brand partners.`);
   };
 
   const handleDeleteExpense = (id: string) => {
@@ -404,7 +405,7 @@ export default function FactoryWorkspacePage() {
     showToast("Deleted expense entry.");
   };
 
-  // --- Fabric Inventory & 1-Click Auto-PO Handlers ---
+  // --- Fabric Inventory & Supplier PO Handlers ---
   const handleGenerateAutoPo = (item: FabricInventoryItem) => {
     const recommendedQty = Math.max(
       item.reorderThreshold * 2 - item.stockLevel,
@@ -412,7 +413,7 @@ export default function FactoryWorkspacePage() {
     );
     const po: SupplierPurchaseOrder = {
       id: `po-${Date.now()}`,
-      poNumber: `PO-AUTO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(
+      poNumber: `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(
         100 + Math.random() * 900
       )}`,
       supplierName: item.supplierName,
@@ -429,11 +430,11 @@ export default function FactoryWorkspacePage() {
     setPurchaseOrders(nextPos);
     savePurchaseOrders(nextPos);
     const logs = appendAuditLog({
-      action: "procurement.auto_po_issued",
-      actor: "AI Velocity Engine",
-      role: "Procurement Automation",
+      action: "procurement.po_issued",
+      actor: "Materials Desk",
+      role: "Materials Procurement",
       targetRef: po.poNumber,
-      summary: `Issued 1-Click Auto-PO ${po.poNumber} for ${recommendedQty} ${item.unit} of ${item.name} from ${item.supplierName} (₦${po.totalCostNgn.toLocaleString()}).`,
+      summary: `Issued Purchase Order ${po.poNumber} for ${recommendedQty} ${item.unit} of ${item.name} from ${item.supplierName} (₦${po.totalCostNgn.toLocaleString()}).`,
     });
     setAuditLogs(logs);
     showToast(
@@ -472,11 +473,11 @@ export default function FactoryWorkspacePage() {
     });
     setAuditLogs(logs);
     showToast(
-      `Received ${po.poNumber} — Added +${po.quantityOrdered.toLocaleString()} ${po.unit} to stock!`
+      `Received ${po.poNumber}: added +${po.quantityOrdered.toLocaleString()} ${po.unit} to stock!`
     );
   };
 
-  // --- CRM Handler ---
+  // --- Brand Partner Handler ---
   const handleAddBrandClient = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newClient.brandName.trim() || !newClient.email.trim()) return;
@@ -504,7 +505,7 @@ export default function FactoryWorkspacePage() {
       phone: "",
       city: "Lagos, Nigeria",
     });
-    showToast(`Added ${created.brandName} to B2B Fashion Label CRM.`);
+    showToast(`Added ${created.brandName} to Brand Partner Directory.`);
   };
 
   // --- Finance & OpEx Handler ---
@@ -602,13 +603,7 @@ export default function FactoryWorkspacePage() {
         {/* Top Workspace Header */}
         <div className="section-heading" style={{ marginBottom: 24 }}>
           <div>
-            <div className="section-kicker">
-              FACTORY OPERATIONS WORKSPACE
-            </div>
-            <h2>
-              Artisan Floor, Fabric Runway &amp;{" "}
-              <em>Executive P&amp;L.</em>
-            </h2>
+            <h2>Artisan Floor, Fabric Runway &amp; Plant P&amp;L.</h2>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button
@@ -617,7 +612,7 @@ export default function FactoryWorkspacePage() {
               style={{ minHeight: 40, border: "1px solid var(--line)" }}
               onClick={() => setZReportModalOpen(true)}
             >
-              Daily QC &amp; Output Z-Report <span>🖨</span>
+              <UiIcon name="print" size={14} /> Daily Summary
             </button>
             <button
               type="button"
@@ -625,7 +620,7 @@ export default function FactoryWorkspacePage() {
               style={{ minHeight: 40 }}
               onClick={handleExportAccountingCsv}
             >
-              Export P&amp;L CSV <span>↓</span>
+              Export P&amp;L Sheet
             </button>
           </div>
         </div>
@@ -639,7 +634,7 @@ export default function FactoryWorkspacePage() {
         {/* Executive KPI Strip */}
         <div className="kpi-grid-4">
           <div className="kpi-card">
-            <span className="ticket-label">PIPELINE GROSS REVENUE</span>
+            <span className="ticket-label">Pipeline gross revenue</span>
             <div className="kpi-value mono">
               ₦{grossRevenueNgn.toLocaleString()}
             </div>
@@ -650,7 +645,7 @@ export default function FactoryWorkspacePage() {
           </div>
 
           <div className="kpi-card">
-            <span className="ticket-label">TRUE OPERATING NET PROFIT</span>
+            <span className="ticket-label">Operating net profit</span>
             <div className="kpi-value mono" style={{ color: "var(--ink)" }}>
               ₦{trueNetProfitNgn.toLocaleString()}
             </div>
@@ -661,7 +656,7 @@ export default function FactoryWorkspacePage() {
           </div>
 
           <div className="kpi-card">
-            <span className="ticket-label">ARTISAN ROSTER &amp; QC YIELD</span>
+            <span className="ticket-label">Artisan roster &amp; QC yield</span>
             <div className="kpi-value mono">
               {artisans.length} Specialists
             </div>
@@ -672,12 +667,12 @@ export default function FactoryWorkspacePage() {
           </div>
 
           <div className="kpi-card">
-            <span className="ticket-label">FABRIC &amp; TRIM RUNWAY</span>
+            <span className="ticket-label">Fabric &amp; trim runway</span>
             <div className="kpi-value mono">
               {criticalFabricsCount} Low Runway
             </div>
             <div className="kpi-sub">
-              30-day velocity forecasting · 1-Click Supplier Auto-PO ready
+              30-day consumption forecast, mill POs ready
             </div>
           </div>
         </div>
@@ -697,7 +692,7 @@ export default function FactoryWorkspacePage() {
             }`}
             onClick={() => setActiveTab("pipeline")}
           >
-            01. Production Floor &amp; QC ({orders.length})
+            01. Floor &amp; QC ({orders.length})
           </button>
           <button
             type="button"
@@ -708,7 +703,7 @@ export default function FactoryWorkspacePage() {
             }`}
             onClick={() => setActiveTab("artisans")}
           >
-            02. Tailors, Pattern Designers &amp; QC ({artisans.length})
+            02. Team Roster ({artisans.length})
           </button>
           <button
             type="button"
@@ -719,7 +714,7 @@ export default function FactoryWorkspacePage() {
             }`}
             onClick={() => setActiveTab("inventory")}
           >
-            03. Fabric Runway &amp; Auto-PO ({inventory.length})
+            03. Materials ({inventory.length})
           </button>
           <button
             type="button"
@@ -730,7 +725,7 @@ export default function FactoryWorkspacePage() {
             }`}
             onClick={() => setActiveTab("crm")}
           >
-            04. B2B Brand CRM &amp; Tiers ({clients.length})
+            04. Brand Partners ({clients.length})
           </button>
           <button
             type="button"
@@ -741,7 +736,7 @@ export default function FactoryWorkspacePage() {
             }`}
             onClick={() => setActiveTab("finance")}
           >
-            05. Factory OpEx, P&amp;L &amp; Audit
+            05. P&amp;L Ledger
           </button>
         </div>
 
@@ -758,7 +753,7 @@ export default function FactoryWorkspacePage() {
                 </p>
               </div>
               <Link className="button button-dark" href="/quote" style={{ minHeight: 40 }}>
-                + New Production Order <span>↗</span>
+                + New Order
               </Link>
             </div>
 
@@ -917,12 +912,11 @@ export default function FactoryWorkspacePage() {
                               setTicketModalOpen(true);
                             }}
                           >
-                            Job Ticket 🖨
+                            <UiIcon name="print" size={13} /> Ticket
                           </button>
                           <button
                             type="button"
-                            className="mkp-inline-btn"
-                            style={{ color: "#9e2a2b" }}
+                            className="mkp-inline-btn mkp-inline-btn-danger"
                             onClick={() => handleDeleteOrder(order.jobCode)}
                           >
                             Delete
@@ -943,7 +937,7 @@ export default function FactoryWorkspacePage() {
             <div className="panel-header-row">
               <div>
                 <h3>
-                  Artisan &amp; Specialist Roster — Pattern Designers, Cutting
+                  Artisan &amp; Specialist Roster: Pattern Designers, Cutting
                   Masters, Tailors &amp; Quality Control
                 </h3>
                 <p>
@@ -958,7 +952,7 @@ export default function FactoryWorkspacePage() {
                 style={{ minHeight: 40 }}
                 onClick={() => setArtisanModalOpen(true)}
               >
-                + Onboard Artisan / Specialist
+                + Add Specialist
               </button>
             </div>
 
@@ -972,13 +966,13 @@ export default function FactoryWorkspacePage() {
                 <thead>
                   <tr>
                     <th>Specialist / Admin Name</th>
-                    <th>Access Tier &amp; Role</th>
+                    <th>Access Level &amp; Role</th>
                     <th>Assigned Station / Line</th>
                     <th>Technical Specialty</th>
                     <th>Active Runs</th>
                     <th>Monthly Output</th>
                     <th>QC First-Pass Yield</th>
-                    <th>CRUD Actions</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1022,8 +1016,7 @@ export default function FactoryWorkspacePage() {
                           </button>
                           <button
                             type="button"
-                            className="mkp-inline-btn"
-                            style={{ color: "#9e2a2b" }}
+                            className="mkp-inline-btn mkp-inline-btn-danger"
                             onClick={() => handleDeleteArtisan(art)}
                           >
                             Delete
@@ -1038,19 +1031,18 @@ export default function FactoryWorkspacePage() {
           </div>
         )}
 
-        {/* TAB 3: FABRIC & TRIM RUNWAY + 1-CLICK SUPPLIER AUTO-PO */}
+        {/* TAB 3: FABRIC & TRIM RUNWAY + SUPPLIER PURCHASE ORDERS */}
         {activeTab === "inventory" && (
           <div className="workspace-panel">
             <div className="panel-header-row">
               <div>
                 <h3>
-                  Fabric Roll &amp; Trim Runway · AI 30-Day Velocity &amp;
-                  1-Click Supplier Auto-PO
+                  Fabric Roll &amp; Trim Runway &amp; Supplier Purchase Orders
                 </h3>
                 <p>
-                  Monitors daily cutting table consumption (`meters/day`),
-                  calculates remaining stock runway, and issues 1-click
-                  replenishment Purchase Orders to textile mills.
+                  Monitors daily cutting table consumption (meters/day),
+                  calculates remaining stock runway, and issues replenishment
+                  Purchase Orders to textile mills.
                 </p>
               </div>
             </div>
@@ -1067,11 +1059,11 @@ export default function FactoryWorkspacePage() {
                     <th>SKU &amp; Lot</th>
                     <th>Material / Trim Description</th>
                     <th>Current Stock</th>
-                    <th>Burn Velocity</th>
+                    <th>Daily Consumption</th>
                     <th>Runway Left</th>
                     <th>Urgency</th>
                     <th>Preferred Textile Supplier</th>
-                    <th>1-Click Auto-PO</th>
+                    <th>Supplier PO</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1080,10 +1072,10 @@ export default function FactoryWorkspacePage() {
                       item.stockLevel / Math.max(1, item.dailyBurnRate);
                     const status =
                       daysLeft < 7
-                        ? "CRITICAL"
+                        ? "Critical"
                         : daysLeft < 14
-                        ? "REORDER SOON"
-                        : "HEALTHY";
+                        ? "Reorder soon"
+                        : "Healthy";
                     return (
                       <tr key={item.id}>
                         <td className="mono">
@@ -1113,9 +1105,9 @@ export default function FactoryWorkspacePage() {
                         <td>
                           <span
                             className={`mkp-badge ${
-                              status === "CRITICAL"
+                              status === "Critical"
                                 ? "mkp-badge-critical"
-                                : status === "REORDER SOON"
+                                : status === "Reorder soon"
                                 ? "mkp-badge-warn"
                                 : "mkp-badge-olive"
                             }`}
@@ -1132,7 +1124,7 @@ export default function FactoryWorkspacePage() {
                               style={{ minHeight: 34, padding: "0 12px", fontSize: 10 }}
                               onClick={() => handleGenerateAutoPo(item)}
                             >
-                              1-Click Auto-PO <span>↗</span>
+                              Issue PO
                             </button>
                             <button
                               type="button"
@@ -1143,8 +1135,7 @@ export default function FactoryWorkspacePage() {
                             </button>
                             <button
                               type="button"
-                              className="mkp-inline-btn"
-                              style={{ color: "#9e2a2b" }}
+                              className="mkp-inline-btn mkp-inline-btn-danger"
                               onClick={() =>
                                 handleDeleteInventoryItem(item.id, item.sku)
                               }
@@ -1198,7 +1189,7 @@ export default function FactoryWorkspacePage() {
                       </td>
                       <td>
                         <span className="mkp-badge mkp-badge-olive">
-                          {po.status.toUpperCase()}
+                          {po.status}
                         </span>
                       </td>
                       <td>
@@ -1208,7 +1199,7 @@ export default function FactoryWorkspacePage() {
                             className="mkp-inline-btn"
                             onClick={() => handleReceivePo(po)}
                           >
-                            ✓ Receive into Store &amp; Update Stock
+                            Receive Stock
                           </button>
                         ) : (
                           <span style={{ fontSize: 10, color: "var(--muted)" }}>
@@ -1227,19 +1218,18 @@ export default function FactoryWorkspacePage() {
           </div>
         )}
 
-        {/* TAB 4: B2B FASHION LABEL CRM & VOLUME TIERS */}
+        {/* TAB 4: B2B FASHION BRAND PARTNERS & VOLUME TIERS */}
         {activeTab === "crm" && (
           <div className="workspace-panel">
             <div className="panel-header-row">
               <div>
                 <h3>
-                  B2B Fashion Label CRM, Volume Tiers &amp; Partner Contract
-                  Codes
+                  B2B Fashion Brand Partners, Volume Tiers &amp; Contract Codes
                 </h3>
                 <p>
                   Tracks lifetime garment volume, automatic B2B tier discounts
-                  (Emerging → Studio 3% → Collection 7% → Heritage VIP 12%),
-                  and active partner codes.
+                  (Emerging, Studio 3%, Collection 7%, Heritage VIP 12%), and
+                  active partner codes.
                 </p>
               </div>
             </div>
@@ -1275,7 +1265,7 @@ export default function FactoryWorkspacePage() {
                     <th>Lifetime Volume</th>
                     <th>Lifetime Production Spend</th>
                     <th>Contract Discount</th>
-                    <th>CRUD Actions</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1318,8 +1308,7 @@ export default function FactoryWorkspacePage() {
                           </button>
                           <button
                             type="button"
-                            className="mkp-inline-btn"
-                            style={{ color: "#9e2a2b" }}
+                            className="mkp-inline-btn mkp-inline-btn-danger"
                             onClick={() => handleDeleteClient(c.id, c.brandName)}
                           >
                             Delete
@@ -1371,20 +1360,20 @@ export default function FactoryWorkspacePage() {
                 className="button button-dark"
                 style={{ minHeight: 38, marginTop: 12 }}
               >
-                Add Brand Partner to CRM <span>+</span>
+                Add Brand Partner
               </button>
             </form>
           </div>
         )}
 
-        {/* TAB 5: FACTORY OPEX LEDGER, P&L & IMMUTABLE AUDIT TRAIL */}
+        {/* TAB 5: FACTORY OPEX LEDGER, P&L & ACTIVITY LOG */}
         {activeTab === "finance" && (
           <div className="workspace-panel">
             <div className="panel-header-row">
               <div>
                 <h3>
-                  Lagos Factory Operating Expenses (OpEx), True Net Profit &amp;
-                  Audit Trail
+                  Lagos Factory Operating Expenses (OpEx), Net Profit &amp;
+                  Activity Log
                 </h3>
                 <p>
                   Reconciles production revenue against fabric COGS and factory
@@ -1459,7 +1448,7 @@ export default function FactoryWorkspacePage() {
                 className="button button-dark"
                 style={{ minHeight: 38, marginTop: 12 }}
               >
-                Log Expense Entry <span>+</span>
+                Log Expense
               </button>
             </form>
 
@@ -1488,7 +1477,7 @@ export default function FactoryWorkspacePage() {
                       </td>
                       <td>
                         <span className="size-pill-item">
-                          {exp.category.replace(/_/g, " ").toUpperCase()}
+                          {exp.category.replace(/_/g, " ")}
                         </span>
                       </td>
                       <td>{exp.description}</td>
@@ -1499,8 +1488,7 @@ export default function FactoryWorkspacePage() {
                       <td>
                         <button
                           type="button"
-                          className="mkp-inline-btn"
-                          style={{ color: "#9e2a2b" }}
+                          className="mkp-inline-btn mkp-inline-btn-danger"
                           onClick={() => handleDeleteExpense(exp.id)}
                         >
                           Delete
@@ -1513,7 +1501,7 @@ export default function FactoryWorkspacePage() {
             </div>
 
             <h4 style={{ marginTop: 36, marginBottom: 12 }}>
-              Immutable Factory &amp; QC Security Audit Trail
+              Factory &amp; Quality Activity Log
             </h4>
             <div
               className="table-scroll-wrap"
@@ -1568,13 +1556,13 @@ export default function FactoryWorkspacePage() {
       <ModalDialog
         open={artisanModalOpen}
         onClose={() => setArtisanModalOpen(false)}
-        title="Onboard Superadmin, Admin or Technical Specialist"
+        title="Add Plant Manager or Technical Specialist"
         maxWidth={540}
       >
         <form className="quote-form" style={{ padding: 0, boxShadow: "none" }} onSubmit={handleCreateArtisan}>
           <div className="form-row">
             <label>
-              Access Tier (RBAC) *
+              Access level *
               <select
                 value={newArtisan.accessTier}
                 onChange={(e) =>
@@ -1661,7 +1649,7 @@ export default function FactoryWorkspacePage() {
                   marginBottom: 4,
                 }}
               >
-                8+ characters (optional — or use OTP Reset Password)
+                8+ characters (optional, or send a password reset code)
               </span>
               <input
                 name="password"
@@ -1717,7 +1705,7 @@ export default function FactoryWorkspacePage() {
       <ModalDialog
         open={Boolean(editingOrder)}
         onClose={() => setEditingOrder(null)}
-        title={`Edit Production Order — ${editingOrder?.jobCode || ""}`}
+        title={`Edit Production Order: ${editingOrder?.jobCode || ""}`}
         maxWidth={560}
       >
         {editingOrder && (
@@ -1811,7 +1799,7 @@ export default function FactoryWorkspacePage() {
           setEditArtisanPassword("");
           setEditingArtisan(null);
         }}
-        title={`Edit Account — ${editingArtisan?.name || ""}`}
+        title={`Edit Account: ${editingArtisan?.name || ""}`}
         maxWidth={540}
       >
         {editingArtisan && (
@@ -1822,7 +1810,7 @@ export default function FactoryWorkspacePage() {
           >
             <div className="form-row">
               <label>
-                Access Tier (RBAC) *
+                Access level *
                 <select
                   value={editingArtisan.accessTier}
                   onChange={(e) =>
@@ -1929,14 +1917,14 @@ export default function FactoryWorkspacePage() {
                   marginBottom: 4,
                 }}
               >
-                Minimum 8 characters — clears any failed-login lockout, or{" "}
+                Minimum 8 characters (clears any failed-login lockout), or{" "}
                 <Link
                   href={`/reset-password?email=${encodeURIComponent(
                     editingArtisan.email
                   )}`}
                   style={{ textDecoration: "underline", color: "var(--ink)" }}
                 >
-                  open OTP recovery
+                  open password recovery
                 </Link>
               </span>
               <input
@@ -1977,7 +1965,7 @@ export default function FactoryWorkspacePage() {
       <ModalDialog
         open={Boolean(editingInventoryItem)}
         onClose={() => setEditingInventoryItem(null)}
-        title={`Edit Material SKU — ${editingInventoryItem?.sku || ""}`}
+        title={`Edit Material SKU: ${editingInventoryItem?.sku || ""}`}
         maxWidth={520}
       >
         {editingInventoryItem && (
@@ -2052,11 +2040,11 @@ export default function FactoryWorkspacePage() {
         )}
       </ModalDialog>
 
-      {/* Edit Brand Client CRM Modal */}
+      {/* Edit Brand Client Modal */}
       <ModalDialog
         open={Boolean(editingClient)}
         onClose={() => setEditingClient(null)}
-        title={`Edit B2B Partner — ${editingClient?.brandName || ""}`}
+        title={`Edit B2B Partner: ${editingClient?.brandName || ""}`}
         maxWidth={520}
       >
         {editingClient && (
@@ -2153,32 +2141,34 @@ export default function FactoryWorkspacePage() {
         )}
       </ModalDialog>
 
-      {/* Printable Factory Daily Z-Report Modal */}
+      {/* Printable Factory Daily Summary Modal */}
       <ModalDialog
         open={zReportModalOpen}
         onClose={() => setZReportModalOpen(false)}
-        title="End-of-Day Factory Production, QC & P&L Z-Report"
+        title="End-of-Day Production, Quality & P&L Summary"
         maxWidth={560}
       >
         <div className="job-ticket-sheet">
           <div className="job-ticket-top">
             <div>
               <div className="wordmark-main" style={{ fontSize: 18 }}>
-                MISS KUDI PRODUCTIONS
+                Miss Kudi Productions
               </div>
               <div className="wordmark-sub">
-                DAILY FACTORY Z-REPORT · LAGOS, NIGERIA
+                Daily production summary, Surulere, Lagos
               </div>
             </div>
             <div className="mono" style={{ fontSize: 12, textAlign: "right" }}>
-              <div>Z-REP-{new Date().toISOString().slice(0, 10)}</div>
+              <div>SUM-{new Date().toISOString().slice(0, 10)}</div>
               <div>{new Date().toLocaleTimeString()}</div>
             </div>
           </div>
 
           <hr className="ticket-divider" />
 
-          <div className="ticket-label">1. SEWING FLOOR &amp; QUALITY CONTROL SUMMARY</div>
+          <div className="ticket-label">
+            1. Sewing floor &amp; quality control summary
+          </div>
           <table className="ticket-size-table" style={{ marginTop: 6 }}>
             <thead>
               <tr>
@@ -2199,19 +2189,19 @@ export default function FactoryWorkspacePage() {
           </table>
 
           <div className="ticket-label" style={{ marginTop: 14 }}>
-            2. ARTISAN DEPARTMENT BREAKDOWN
+            2. Artisan department breakdown
           </div>
           <div style={{ fontSize: 11.5, display: "grid", gap: 4, marginTop: 6 }}>
             <div>
-              • <strong>Pattern Designers:</strong> {patternDesigners.length} active (
+              <strong>Pattern Designers:</strong> {patternDesigners.length} active (
               {patternDesigners.map((p) => p.name).join(", ")})
             </div>
             <div>
-              • <strong>Master Tailors / Sewing Lines:</strong> {tailors.length} leads (
+              <strong>Master Tailors / Sewing Lines:</strong> {tailors.length} leads (
               {tailors.map((t) => t.name).join(", ")})
             </div>
             <div>
-              • <strong>Quality Control (QC) Inspectors:</strong>{" "}
+              <strong>Quality Control (QC) Inspectors:</strong>{" "}
               {qcInspectors.length} active (
               {qcInspectors.map((q) => q.name).join(", ")})
             </div>
@@ -2219,7 +2209,9 @@ export default function FactoryWorkspacePage() {
 
           <hr className="ticket-divider" />
 
-          <div className="ticket-label">3. FINANCIAL &amp; OPEX RECONCILIATION</div>
+          <div className="ticket-label">
+            3. Financial &amp; operating expense reconciliation
+          </div>
           <div style={{ display: "grid", gap: 6, fontSize: 12, marginTop: 6 }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span>Gross Pipeline Production Value:</span>
@@ -2248,7 +2240,7 @@ export default function FactoryWorkspacePage() {
                 color: "var(--ink)",
               }}
             >
-              <span>TRUE OPERATING NET PROFIT:</span>
+              <span>Operating net profit:</span>
               <span className="mono">
                 ₦{trueNetProfitNgn.toLocaleString()}
               </span>
@@ -2266,7 +2258,7 @@ export default function FactoryWorkspacePage() {
             style={{ flex: 1, minHeight: 40 }}
             onClick={() => window.print()}
           >
-            Print Factory Z-Report <span>🖨</span>
+            <UiIcon name="print" size={14} /> Print Summary
           </button>
           <button
             type="button"

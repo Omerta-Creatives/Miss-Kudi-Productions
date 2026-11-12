@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { UiIcon } from "../components/UiIcon";
 import {
   ACCESS_TIER_LABELS,
   appendAuditLog,
@@ -454,7 +455,7 @@ export default function RoleDashboardPage() {
       .catch(() => {});
 
     appendAuditLog({
-      action: "rbac.user_created",
+      action: "team.user_created",
       actor: user.name,
       role: ACCESS_TIER_LABELS[user.accessTier],
       targetRef: created.email,
@@ -511,7 +512,7 @@ export default function RoleDashboardPage() {
       .catch(() => {});
 
     appendAuditLog({
-      action: "rbac.user_updated",
+      action: "team.user_updated",
       actor: user.name,
       role: ACCESS_TIER_LABELS[user.accessTier],
       targetRef: updated.email,
@@ -547,7 +548,7 @@ export default function RoleDashboardPage() {
     ).catch(() => {});
 
     appendAuditLog({
-      action: "rbac.user_deleted",
+      action: "team.user_deleted",
       actor: user.name,
       role: ACCESS_TIER_LABELS[user.accessTier],
       targetRef: target.email,
@@ -918,7 +919,7 @@ export default function RoleDashboardPage() {
                     >
                       <span className="sidebar-nav-btn-label">
                         <span className="sidebar-nav-icon" aria-hidden="true">
-                          ⚙
+                          <UiIcon name="settings" size={14} />
                         </span>
                         <span>My Work Queue</span>
                       </span>
@@ -1050,12 +1051,12 @@ export default function RoleDashboardPage() {
           {/* Clean Session & Account Footer */}
           <div className="sidebar-footer-card">
             <div className="sidebar-section-label" style={{ marginTop: 0 }}>
-              SESSION
+              Session
             </div>
             {isSuper && (
               <Link className="sidebar-quick-btn" href="/superadmin">
                 <span>Superadmin HQ</span>
-                <span aria-hidden="true">★</span>
+                <UiIcon name="star" size={14} />
               </Link>
             )}
             <Link
@@ -1063,7 +1064,7 @@ export default function RoleDashboardPage() {
               href="/login?mode=change-password"
             >
               <span>Change Password</span>
-              <span aria-hidden="true">⚙</span>
+              <UiIcon name="settings" size={14} />
             </Link>
             <button
               type="button"
@@ -1072,7 +1073,6 @@ export default function RoleDashboardPage() {
               disabled={signingOut}
             >
               <span>{signingOut ? "Signing out..." : "Sign Out"}</span>
-              <span aria-hidden="true">⇥</span>
             </button>
           </div>
         </aside>
@@ -1220,7 +1220,7 @@ export default function RoleDashboardPage() {
                           setShowAllFloorRuns(false);
                         }}
                       >
-                        View full queue ({displayedStaffOrders.length}) →
+                        Full queue ({displayedStaffOrders.length})
                       </button>
                     </div>
 
@@ -1235,7 +1235,7 @@ export default function RoleDashboardPage() {
                             setShowAllFloorRuns(true);
                           }}
                         >
-                          Browse all plant orders ({orders.length}) →
+                          Plant orders ({orders.length})
                         </button>
                       </div>
                     ) : (
@@ -1251,9 +1251,9 @@ export default function RoleDashboardPage() {
                                 </span>
                               </div>
                               <div className="summary-row-sub">
-                                {ord.garmentCategory} ·{" "}
-                                {ord.exactQuantity.toLocaleString()} pcs · Sewn{" "}
-                                {ord.unitsSewn}/{ord.exactQuantity} · Due{" "}
+                                {ord.garmentCategory},{" "}
+                                {ord.exactQuantity.toLocaleString()} pcs, Sewn{" "}
+                                {ord.unitsSewn}/{ord.exactQuantity}, Due{" "}
                                 {ord.targetDeliveryDate}
                               </div>
                             </div>
@@ -1291,7 +1291,7 @@ export default function RoleDashboardPage() {
                         className="mkp-inline-btn"
                         onClick={() => setActiveSection("inventory")}
                       >
-                        Browse all materials ({inventory.length}) →
+                        All materials ({inventory.length})
                       </button>
                     </div>
                     {inventory.length === 0 ? (
@@ -1638,7 +1638,7 @@ export default function RoleDashboardPage() {
                           className="mkp-inline-btn"
                           onClick={() => setActiveSection("orders")}
                         >
-                          Manage all orders ({orders.length}) →
+                          All orders ({orders.length})
                         </button>
                       </div>
                     </div>
@@ -1672,9 +1672,9 @@ export default function RoleDashboardPage() {
                                 </span>
                               </div>
                               <div className="summary-row-sub">
-                                {ord.garmentCategory} ·{" "}
-                                {ord.exactQuantity.toLocaleString()} pcs · ₦
-                                {ord.totalQuoteNgn.toLocaleString()} · Due{" "}
+                                {ord.garmentCategory},{" "}
+                                {ord.exactQuantity.toLocaleString()} pcs, ₦
+                                {ord.totalQuoteNgn.toLocaleString()}, Due{" "}
                                 {ord.targetDeliveryDate}
                               </div>
                             </div>
@@ -1715,7 +1715,7 @@ export default function RoleDashboardPage() {
                     )}
                   </div>
 
-                  {/* Scannable 2-Card Operational Snapshot (Zero cramped side-by-side CRUD tables) */}
+                  {/* Scannable 2-Card Operational Snapshot */}
                   <div className="overview-summary-grid">
                     {/* Card A: Materials & Stock Health */}
                     <div className="workspace-panel">
@@ -1733,7 +1733,7 @@ export default function RoleDashboardPage() {
                           className="mkp-inline-btn"
                           onClick={() => setActiveSection("inventory")}
                         >
-                          Manage stock →
+                          Manage stock
                         </button>
                       </div>
 
@@ -1818,7 +1818,7 @@ export default function RoleDashboardPage() {
                           className="mkp-inline-btn"
                           onClick={() => setActiveSection("roster")}
                         >
-                          Manage team →
+                          Manage team
                         </button>
                       </div>
 
@@ -2034,12 +2034,11 @@ export default function RoleDashboardPage() {
                                       setTicketOpen(true);
                                     }}
                                   >
-                                    Ticket 🖨
+                                    <UiIcon name="print" size={13} /> Ticket
                                   </button>
                                   <button
                                     type="button"
-                                    className="mkp-inline-btn"
-                                    style={{ color: "#9e2a2b" }}
+                                    className="mkp-inline-btn mkp-inline-btn-danger"
                                     onClick={() => handleDeleteOrder(ord)}
                                   >
                                     Delete
@@ -2196,8 +2195,7 @@ export default function RoleDashboardPage() {
                                   {sp.id !== user.id && (
                                     <button
                                       type="button"
-                                      className="mkp-inline-btn"
-                                      style={{ color: "#9e2a2b" }}
+                                      className="mkp-inline-btn mkp-inline-btn-danger"
                                       onClick={() => handleDeleteBranchStaff(sp)}
                                     >
                                       Delete
@@ -2230,16 +2228,13 @@ export default function RoleDashboardPage() {
                       />
                       <button
                         type="button"
-                        className="mkp-inline-btn"
-                        style={
-                          showLowStockOnly
-                            ? { background: "var(--ink)", color: "#fff" }
-                            : undefined
-                        }
+                        className={`mkp-inline-btn ${
+                          showLowStockOnly ? "mkp-inline-btn-active" : ""
+                        }`}
                         onClick={() => setShowLowStockOnly((v) => !v)}
                       >
                         {showLowStockOnly
-                          ? `Showing Low Stock (${lowStockItems.length})`
+                          ? `Low Stock (${lowStockItems.length})`
                           : `Filter Low Stock (${lowStockItems.length})`}
                       </button>
                     </div>
@@ -2369,8 +2364,7 @@ export default function RoleDashboardPage() {
                                         </button>
                                         <button
                                           type="button"
-                                          className="mkp-inline-btn"
-                                          style={{ color: "#9e2a2b" }}
+                                          className="mkp-inline-btn mkp-inline-btn-danger"
                                           onClick={() => handleDeleteSku(item)}
                                         >
                                           Delete
@@ -3090,7 +3084,7 @@ export default function RoleDashboardPage() {
                   marginBottom: 4,
                 }}
               >
-                8+ characters — clears any failed-login lockout
+                8+ characters (clears any failed-login lockout)
               </span>
               <input
                 name="password"

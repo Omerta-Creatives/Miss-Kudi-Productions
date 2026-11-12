@@ -2,9 +2,9 @@ import React, { Suspense } from "react";
 import AuthPortalClient from "../components/AuthPortalClient";
 
 export const metadata = {
-  title: "Staff & Admin Sign-In · Miss Kudi Productions Operations OS",
+  title: "Staff & Admin Sign-In · Miss Kudi Productions",
   description:
-    "Authenticate to Miss Kudi Productions Superadmin HQ, Factory Admin Dashboard, and Floor Production Stations at 1 Alawode Street, Surulere, Lagos.",
+    "Sign in to Miss Kudi Productions Superadmin HQ, Factory Admin Console, and Floor Production Stations at 1 Alawode Street, Surulere, Lagos.",
 };
 
 export default function LoginPage() {

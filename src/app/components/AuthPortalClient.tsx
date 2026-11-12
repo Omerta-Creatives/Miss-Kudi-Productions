@@ -592,16 +592,16 @@ export default function AuthPortalClient({
                 </span>
               </div>
               <div className="auth-active-actions">
-                <Link
-                  href={
-                    sessionUser.accessTier === "superadmin"
-                      ? "/superadmin"
-                      : "/dashboard"
-                  }
-                  className="btn-primary auth-compact-btn"
-                >
-                  Open Console →
-                </Link>
+                  <Link
+                    href={
+                      sessionUser.accessTier === "superadmin"
+                        ? "/superadmin"
+                        : "/dashboard"
+                    }
+                    className="btn-primary auth-compact-btn"
+                  >
+                    Open Console
+                  </Link>
                 <button
                   type="button"
                   className="btn-secondary auth-compact-btn"
@@ -662,7 +662,7 @@ export default function AuthPortalClient({
                 tabIndex={-1}
                 className="auth-alert auth-alert-error"
               >
-                <strong>⚠ Sign-in check failed</strong>
+                <strong>Sign-in check failed</strong>
                 <span>{errorMessage}</span>
               </div>
             )}
@@ -893,7 +893,7 @@ export default function AuthPortalClient({
                           setMode("signin");
                         }}
                       >
-                        ← Back to sign in
+                        Back to sign in
                       </button>
                     </div>
                   </form>
@@ -914,7 +914,7 @@ export default function AuthPortalClient({
                   {dispatchPreview && (
                     <div className="auth-dispatch-preview">
                       <div className="auth-dispatch-top">
-                        <span className="mono">VERIFICATION PREVIEW</span>
+                        <span className="mono">Verification preview</span>
                         <button
                           type="button"
                           className="auth-autofill-otp-btn"
@@ -1065,8 +1065,8 @@ export default function AuthPortalClient({
                       disabled={submitting}
                     >
                       {submitting
-                        ? "Updating password..."
-                        : "Save password & sign in"}
+                        ? "Updating..."
+                        : "Save & sign in"}
                     </button>
 
                     <div className="auth-secondary-links">
@@ -1088,7 +1088,7 @@ export default function AuthPortalClient({
                           setMode("signin");
                         }}
                       >
-                        ← Back to sign in
+                        Back to sign in
                       </button>
                     </div>
                   </form>
